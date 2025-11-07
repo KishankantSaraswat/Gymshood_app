@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "354531004635",
+    "project_id": "gymshood-user-app",
+    "storage_bucket": "gymshood-user-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:354531004635:android:1c6495c418f9042cd73cfe",
+        "android_client_info": {
+          "package_name": "com.mohdqounane.gymshood"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLYX0pVjpfFSoPAzP9a7tvWKjKuZN31Gg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

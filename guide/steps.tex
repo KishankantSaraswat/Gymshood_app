@@ -1,0 +1,160 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{parskip}
+
+\geometry{a4paper, margin=1in}
+
+\definecolor{codebg}{RGB}{240, 240, 240}
+\lstset{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    captionpos=b,
+    tabsize=2
+}
+
+\title{React Native Expo Build Instructions}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document provides complete instructions for generating APK and AAB files starting from a fresh clone of a React Native Expo project. The instructions cover both Linux/macOS and Windows operating systems.
+
+\section{Prerequisites}
+\begin{itemize}
+    \item Node.js (v16 or later recommended)
+    \item Java Development Kit (JDK) 11-17
+    \item Android Studio with:
+    \begin{itemize}
+        \item Android SDK (API level 33+)
+        \item Android Emulator
+        \item Build Tools (33.0.0+)
+    \end{itemize}
+    \item Git installed
+    \item Python (for Windows users)
+\end{itemize}
+
+\section{Initial Setup}
+
+\subsection{Clone the Project}
+\begin{lstlisting}[language=bash, caption=Clone the repository]
+git clone <repository-url>
+cd <project-folder>
+\end{lstlisting}
+
+\subsection{Install Dependencies}
+\begin{lstlisting}[language=bash, caption=Install dependencies]
+npm install
+# or if using yarn
+yarn install
+\end{lstlisting}
+
+\section{Build Preparation}
+
+\subsection{Generate Android/iOS Directories (Expo)}
+\begin{lstlisting}[language=bash, caption=Generate native directories]
+npx expo prebuild
+# or for older Expo versions
+expo prebuild
+\end{lstlisting}
+
+\subsection{For Windows Users: Environment Setup}
+\begin{itemize}
+    \item Install Python 2.7 (required for some native modules)
+    \item Set environment variables:
+    \begin{itemize}
+        \item ANDROID\_HOME to your SDK path (typically C:\textbackslash Users\textbackslash [username]\textbackslash AppData\textbackslash Local\textbackslash Android\textbackslash Sdk)
+        \item Add platform-tools to PATH
+    \end{itemize}
+\end{itemize}
+
+\section{Generating the Bundle}
+
+\subsection{Linux/macOS}
+\begin{lstlisting}[language=bash, caption=Linux/macOS bundle generation]
+# Create assets directory
+mkdir -p android/app/src/main/assets
+
+# Generate bundle
+npx react-native bundle \
+    --platform android \
+    --dev false \
+    --entry-file index.js \
+    --bundle-output android/app/src/main/assets/index.android.bundle \
+    --assets-dest android/app/src/main/res/
+\end{lstlisting}
+
+\subsection{Windows}
+\begin{lstlisting}[language=bash, caption=Windows bundle generation]
+# Create assets directory
+mkdir android\app\src\main\assets
+
+# Generate bundle
+npx react-native bundle ^
+    --platform android ^
+    --dev false ^
+    --entry-file index.js ^
+    --bundle-output android\app\src\main\assets\index.android.bundle ^
+    --assets-dest android\app\src\main\res/
+\end{lstlisting}
+
+\section{Building APK/AAB}
+
+\subsection{For Both Platforms}
+\begin{lstlisting}[language=bash, caption=Build commands]
+# Navigate to android directory
+cd android
+
+# Clean build (recommended)
+./gradlew clean  # Linux/macOS
+gradlew clean    # Windows
+
+# Build APK
+./gradlew assembleRelease  # Linux/macOS
+gradlew assembleRelease    # Windows
+
+# Build AAB (for Play Store)
+./gradlew bundleRelease    # Linux/macOS
+gradlew bundleRelease      # Windows
+\end{lstlisting}
+
+\section{Locating Build Outputs}
+\begin{itemize}
+    \item APK: \texttt{android/app/build/outputs/apk/release/app-release.apk}
+    \item AAB: \texttt{android/app/build/outputs/bundle/release/app-release.aab}
+\end{itemize}
+
+\section{Troubleshooting}
+\begin{itemize}
+    \item \textbf{Missing assets}: Ensure bundle generation completed successfully
+    \item \textbf{Java version issues}: Verify JDK 11-17 is installed
+    \item \textbf{Windows path issues}: Use double backslashes or forward slashes in paths
+    \item \textbf{Memory errors}: Add to \texttt{gradle.properties}:
+    \begin{lstlisting}
+org.gradle.jvmargs=-Xmx4096m -XX:MaxPermSize=1024m
+    \end{lstlisting}
+\end{itemize}
+
+\section{Next Steps}
+\begin{itemize}
+    \item Test the APK on a device or emulator
+    \item For production releases:
+    \begin{itemize}
+        \item Configure code signing
+        \item Update version codes in \texttt{android/app/build.gradle}
+        \item Consider using GitHub Actions or CI/CD for automated builds
+    \end{itemize}
+\end{itemize}
+
+\end{document}
