@@ -11,6 +11,7 @@ import {
   Platform,
   Linking,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../hooks/useAuth";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -20,6 +21,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
@@ -32,21 +34,34 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    console.log("🔑 Login Attempt Started");
+    console.log("📧 Email:", email);
+    // console.log("🔑 Password:", password); // Don't log passwords in production!
+
     if (!email || !password) {
+      console.log("⚠️ Login Validation Failed: Missing fields");
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     setLoading(true);
     try {
+      console.log("🚀 Calling login hook...");
       const success = await login(email, password);
+      console.log("📡 Login Hook Result:", success);
+
       if (success) {
+        console.log("✅ Login Successful! Redirecting to tabs...");
         router.replace("/(tabs)");
+      } else {
+        console.log("❌ Login Failed (Hook returned false/undefined)");
       }
     } catch (error) {
+      console.error("❌ Login Error:", error);
       Alert.alert("Error", "Login failed. Please try again.");
     } finally {
       setLoading(false);
+      console.log("🏁 Login Attempt Finished");
     }
   };
 
@@ -60,19 +75,29 @@ export default function LoginScreen() {
 
   useEffect(() => {
     const checkStoredData = async () => {
+      console.log("💾 Checking for stored user data...");
       const user = await AsyncStorage.getItem("userInfo");
-      const data = JSON.parse(user);
-      if (user) {
-        setEmail(data.email);
-        setPassword(data.password);
+      console.log("💾 Stored Data Found:", !!user);
 
-        setLoading(true);
+      if (user) {
         try {
-          await login(data.email, data.password);
-        } catch (error) {
-          Alert.alert("Error", "Login failed. Please try again.");
-        } finally {
-          setLoading(false);
+          const data = JSON.parse(user);
+          console.log("🔄 Auto-filling login form for:", data.email);
+          setEmail(data.email);
+          setPassword(data.password);
+
+          setLoading(true);
+          try {
+            console.log("🚀 Triggering Auto-Login...");
+            await login(data.email, data.password);
+          } catch (error) {
+            console.error("❌ Auto-Login Failed:", error);
+            Alert.alert("Error", "Login failed. Please try again.");
+          } finally {
+            setLoading(false);
+          }
+        } catch (parseError) {
+          console.error("❌ Failed to parse stored user data:", parseError);
         }
       }
     };
@@ -101,13 +126,25 @@ export default function LoginScreen() {
             keyboardType="email-address"
           />
           <Text>Enter your password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={24}
+                color="#a4a1a1ff"
+              />
+            </TouchableOpacity>
+          </View>
           <View style={styles.policyLinksContainer}>
             <Text style={styles.policyText}>
               By using our app, you agree to our{" "}
@@ -195,6 +232,24 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: "#fff",
     color: "#000",
+  },
+  passwordContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderColor: "#ddd",
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    marginBottom: 15,
+  },
+  passwordInput: {
+    flex: 1,
+    height: 50,
+    paddingHorizontal: 15,
+    color: "#000",
+  },
+  eyeIcon: {
+    padding: 10,
   },
   button: {
     height: 50,

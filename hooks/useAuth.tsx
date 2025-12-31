@@ -11,13 +11,25 @@ const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
 interface User {
   email: string;
   name: string;
+  _id: string;
 }
 
 // Auth context interface
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    phone?: string,
+    height?: string,
+    weight?: string,
+    gender?: string,
+    foodType?: string,
+    address?: string,
+    pincode?: string
+  ) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -26,7 +38,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => false,
   register: async () => false,
-  logout: () => {},
+  logout: () => { },
 });
 
 // Props for the AuthProvider
@@ -50,7 +62,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
 
       if (!response.ok) {
-        throw new Error("Invalid credentials");
+        const errorData = await response.json();
+        console.error("❌ Login Failed Response:", errorData);
+        throw new Error(errorData.message || "Invalid credentials");
       }
 
       const data = await response.json();
@@ -59,13 +73,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         "userInfo",
         JSON.stringify({
           email: email,
-          name: data.name,
+          name: data.user.name,
           password: password,
           _id: data.user._id,
         })
       );
       console.log("profile", data);
-      setUser({ email: data.email, name: data.name });
+
+      // Set user with name and email
+      setUser({
+        email: email,
+        name: data.user.name,
+        _id: data.user._id
+      });
+
       const profileRes = await fetch(
         `${API_BASE_URL}user-data/${data.user._id}`
       );
@@ -73,7 +94,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.log("profile", profileRes.status);
 
       if (profileRes.status === 404) {
-        router.replace("/UserDataScreen");
+        router.replace("/UserDataScreen?isNewUser=true");
       } else if (profileRes.status === 200) {
         router.replace("/(tabs)");
       } else {
@@ -87,24 +108,61 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return false;
     }
   };
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    phone?: string,
+    height?: string,
+    weight?: string,
+    gender?: string,
+    foodType?: string,
+    address?: string,
+    pincode?: string
+  ) => {
+    console.log("🚀 Starting Registration...");
+    console.log("📦 Payload:", { name, email, password, phone, height, weight, gender, foodType, address, pincode, role: "User" });
+    console.log("🔗 Target URL:", `${API_BASE_URL}auth/register`);
+
     try {
       const response = await fetch(`${API_BASE_URL}auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role: "User" }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          phone,
+          height: height ? Number(height) : undefined,
+          weight: weight ? Number(weight) : undefined,
+          gender,
+          foodType,
+          address,
+          pincode,
+          role: "User"
+        }),
       });
-      if (!response.ok) throw new Error("Registration failed");
+
+      console.log("📡 Response Status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Registration Failed Response:", errorText);
+        throw new Error(`Registration failed: ${response.status} ${errorText}`);
+      }
 
       const data = await response.json();
+      console.log("✅ Registration Success Data:", data);
+
       await AsyncStorage.setItem(
         "registrationSessionId",
         data.registrationSessionId
       );
-      setUser({ email: data.email, name: data.name });
+      // Don't set user here since we don't have _id yet
+      // User will be set after OTP verification and login
       return true;
     } catch (err: any) {
-      console.error("Registration error:", err.message);
+      console.error("❌ Registration Error Catch:", err.message);
       return false;
     }
   };

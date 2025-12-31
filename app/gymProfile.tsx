@@ -22,6 +22,7 @@ import {
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
 const { width } = Dimensions.get("window");
+import { fixUrl } from "../utils/imageHelper";
 
 export function getValidity(planDuration: string) {
   if (planDuration.trim() === "1 day") {
@@ -35,11 +36,22 @@ export function getValidity(planDuration: string) {
   }
 }
 
-// Tab Components - Remove ScrollView from individual tabs
+
+
 const PhotosTab = ({ gym }: { gym: any }) => {
-  const imageUrls = (gym.media?.mediaUrls || []).filter((url: string) =>
-    /\.(jpg|jpeg|png|gif|webp)$/i.test(url)
-  );
+
+  const rawImages = [
+    gym.media?.frontPhotoUrl,
+    gym.media?.receptionPhotoUrl,
+    gym.media?.workoutFloorPhotoUrl,
+    gym.media?.lockerRoomPhotoUrl,
+    gym.media?.trainerTeamPhotoUrl,
+    ...(gym.media?.mediaUrls || [])
+  ];
+
+  const imageUrls = rawImages
+    .filter(url => url && typeof url === 'string' && /\.(jpg|jpeg|png|gif|webp|jp._)$/i.test(url))
+    .map((url: string) => fixUrl(url));
 
   return (
     <View style={styles.tabContent}>
@@ -56,7 +68,11 @@ const PhotosTab = ({ gym }: { gym: any }) => {
                 })
               }
             >
-              <Image source={{ uri: url }} style={styles.photoImage} />
+              <Image
+                source={{ uri: fixUrl(url) }}
+                style={styles.photoImage}
+                onError={(e) => console.log(`Failed to load photo: ${url}`, e.nativeEvent.error)}
+              />
             </TouchableOpacity>
           ))}
         </View>
@@ -139,8 +155,8 @@ const SlotsTab = ({ gym }: { gym: any }) => {
                             shift.gender === "unisex"
                               ? "male-female"
                               : shift.gender === "male"
-                              ? "male"
-                              : "female"
+                                ? "male"
+                                : "female"
                           }
                           size={14}
                           color="#6C63FF"
@@ -149,8 +165,8 @@ const SlotsTab = ({ gym }: { gym: any }) => {
                           {shift.gender === "unisex"
                             ? "Unisex"
                             : shift.gender === "male"
-                            ? "Men Only"
-                            : "Women Only"}
+                              ? "Men Only"
+                              : "Women Only"}
                         </Text>
                       </View>
                     </View>
@@ -272,7 +288,9 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
         credentials: "include",
       });
       const data = await res.json();
-      setcurrentUserName(data.user.name);
+      if (data && data.user) {
+        setcurrentUserName(data.user.name);
+      }
     } catch (e) {
       console.error("Error fetching current user", e);
     }
@@ -288,9 +306,17 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
         }
       );
       const data = await response.json();
-      setReviews(data.ratings || []);
 
-      const existing = data.ratings.find(
+      if (!response.ok) {
+        console.error("Server error detail:", data);
+        Alert.alert("Error", data.message || "Failed to fetch reviews");
+        return;
+      }
+
+      const ratings = data.ratings || [];
+      setReviews(ratings);
+
+      const existing = ratings.find(
         (r: any) => r.user?.name === currentUserName
       );
 
@@ -332,14 +358,14 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
 
       const payload = existingReviewId
         ? {
-            stars: rating,
-            comment: feedback,
-          }
+          stars: rating,
+          comment: feedback,
+        }
         : {
-            gymId,
-            rating: rating,
-            feedback,
-          };
+          gymId,
+          rating: rating,
+          feedback,
+        };
 
       const response = await fetch(url, {
         method,
@@ -417,109 +443,100 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.reviewsContainer}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-    >
-      <ScrollView
-        contentContainerStyle={styles.reviewsScrollContainer}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Review Form */}
-        <View style={reviewStyles.reviewFormContainer}>
-          <Text style={reviewStyles.sectionTitle}>
-            {existingReviewId ? "Edit Your Review" : "Write a Review"}
-          </Text>
+    <View style={reviewStyles.reviewsContainer}>
+      {/* Review Form */}
+      <View style={reviewStyles.reviewFormContainer}>
+        <Text style={reviewStyles.sectionTitle}>
+          {existingReviewId ? "Edit Your Review" : "Write a Review"}
+        </Text>
 
-          <StarRatingInput />
+        <StarRatingInput />
 
-          <View style={reviewStyles.feedbackContainer}>
-            <Text style={styles.inputLabel}>Your Feedback*</Text>
-            <TextInput
-              style={styles.feedbackInput}
-              placeholder="Share your experience with this gym..."
-              placeholderTextColor="#999"
-              multiline
-              numberOfLines={4}
-              value={feedback}
-              onChangeText={setFeedback}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              submitting && styles.submitButtonDisabled,
-              (!rating || !feedback.trim()) &&
-                reviewStyles.submitButtonInactive,
-            ]}
-            onPress={submitReview}
-            disabled={submitting || !rating || !feedback.trim()}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.submitButtonText}>
-                {existingReviewId ? "Update Review" : "Submit Review"}
-              </Text>
-            )}
-          </TouchableOpacity>
+        <View style={reviewStyles.feedbackContainer}>
+          <Text style={styles.inputLabel}>Your Feedback*</Text>
+          <TextInput
+            style={styles.feedbackInput}
+            placeholder="Share your experience with this gym..."
+            placeholderTextColor="#999"
+            multiline
+            numberOfLines={4}
+            value={feedback}
+            onChangeText={setFeedback}
+          />
         </View>
 
-        {/* Reviews List */}
-        <View style={reviewStyles.reviewsListContainer}>
-          <Text style={reviewStyles.sectionTitle}>
-            {reviews.length > 0
-              ? `Member Reviews (${reviews.length})`
-              : "No Reviews Yet"}
-          </Text>
-
-          {loading ? (
-            <ActivityIndicator size="large" color="#6C63FF" />
-          ) : reviews.length > 0 ? (
-            reviews.map((review, index) => (
-              <View key={index} style={reviewStyles.reviewCard}>
-                <View style={styles.reviewHeader}>
-                  <View style={reviewStyles.userInfo}>
-                    <Ionicons
-                      name="person-circle"
-                      size={32}
-                      color="#6C63FF"
-                      style={reviewStyles.userIcon}
-                    />
-                    <Text style={reviewStyles.userName}>
-                      {review.user?.name || "Anonymous"}
-                    </Text>
-                  </View>
-                  <View style={reviewStyles.reviewMeta}>
-                    {renderStars(review.rating)}
-                    <Text style={reviewStyles.reviewDate}>
-                      {new Date(review.createdAt).toLocaleDateString()}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={reviewStyles.reviewContent}>
-                  {review.feedback}
-                </Text>
-
-                {index < reviews.length - 1 && (
-                  <View style={styles.reviewDivider} />
-                )}
-              </View>
-            ))
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            submitting && styles.submitButtonDisabled,
+            (!rating || !feedback.trim()) &&
+            reviewStyles.submitButtonInactive,
+          ]}
+          onPress={submitReview}
+          disabled={submitting || !rating || !feedback.trim()}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#FFF" />
           ) : (
-            <View style={styles.noReviewsContainer}>
-              <Ionicons name="chatbox-outline" size={48} color="#CCCCCC" />
-              <Text style={reviewStyles.noReviewsText}>
-                Be the first to review this gym!
-              </Text>
-            </View>
+            <Text style={styles.submitButtonText}>
+              {existingReviewId ? "Update Review" : "Submit Review"}
+            </Text>
           )}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </View>
+
+      {/* Reviews List */}
+      <View style={reviewStyles.reviewsListContainer}>
+        <Text style={reviewStyles.sectionTitle}>
+          {reviews.length > 0
+            ? `Member Reviews (${reviews.length})`
+            : "No Reviews Yet"}
+        </Text>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#6C63FF" />
+        ) : reviews.length > 0 ? (
+          reviews.map((review, index) => (
+            <View key={index} style={reviewStyles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <View style={reviewStyles.userInfo}>
+                  <Ionicons
+                    name="person-circle"
+                    size={32}
+                    color="#6C63FF"
+                    style={reviewStyles.userIcon}
+                  />
+                  <Text style={reviewStyles.userName}>
+                    {review.user?.name || "Anonymous"}
+                  </Text>
+                </View>
+                <View style={reviewStyles.reviewMeta}>
+                  {renderStars(review.rating)}
+                  <Text style={reviewStyles.reviewDate}>
+                    {new Date(review.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={reviewStyles.reviewContent}>
+                {review.feedback}
+              </Text>
+
+              {index < reviews.length - 1 && (
+                <View style={styles.reviewDivider} />
+              )}
+            </View>
+          ))
+        ) : (
+          <View style={styles.noReviewsContainer}>
+            <Ionicons name="chatbox-outline" size={48} color="#CCCCCC" />
+            <Text style={reviewStyles.noReviewsText}>
+              Be the first to review this gym!
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
   );
 };
 
@@ -792,11 +809,16 @@ export default function GymProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+    >
       <ScrollView
         style={styles.mainScrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.mainScrollContent}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
@@ -813,10 +835,13 @@ export default function GymProfileScreen() {
             <Image
               source={
                 gym.media?.logoUrl
-                  ? { uri: gym.media.logoUrl }
+                  ? {
+                    uri: fixUrl(gym.media.logoUrl)
+                  }
                   : require("../assets/images/favicon.png")
               }
               style={styles.profileImage}
+              onError={(e) => console.log(`Failed to load logo: ${gym.media?.logoUrl}`, e.nativeEvent.error)}
             />
           </TouchableOpacity>
 
@@ -885,7 +910,7 @@ export default function GymProfileScreen() {
           {renderScene({ route: routes[index] })}
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1248,12 +1273,16 @@ const styles = StyleSheet.create({
   slotInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
   },
   slotName: {
+    flex: 1,
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
+    marginRight: 10
+
   },
   slotTime: {
     fontSize: 14,

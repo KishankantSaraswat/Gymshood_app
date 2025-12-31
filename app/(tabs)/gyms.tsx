@@ -20,6 +20,7 @@ import GymCard from "../../components/GymCard";
 import Constants from "expo-constants";
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
+import { fixUrl } from "../../utils/imageHelper";
 
 // Consistent color scheme with other screens
 const COLORS = {
@@ -35,6 +36,24 @@ const COLORS = {
   accent: "#ff6b6b",
 };
 
+interface Gym {
+  _id: string;
+  name: string;
+  location: {
+    address: string;
+    coordinates: [number, number];
+  };
+  about: string;
+  openTime: string;
+  closeTime: string;
+  media?: {
+    logoUrl?: string;
+    mediaUrls?: string[];
+    frontPhotoUrl?: string; // Add this
+  };
+  avgRating?: number;
+}
+
 const getDistance = (
   lat1: number,
   lon1: number,
@@ -48,15 +67,16 @@ const getDistance = (
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
 export default function GymsScreen() {
-  const [gyms, setGyms] = useState([]);
+  console.log("Rendering Gyms Screen");
+  const [gyms, setGyms] = useState<Gym[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userLocation, setUserLocation] = useState<{
@@ -65,7 +85,7 @@ export default function GymsScreen() {
   } | null>(null);
   const [range, setRange] = useState("10");
   const [searchFocused, setSearchFocused] = useState(false);
-  const mapRef = useRef(null);
+  const mapRef = useRef<MapView>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchData = async () => {
@@ -175,6 +195,9 @@ export default function GymsScreen() {
     hour = hour % 12 || 12; // converts 0 → 12, 13 → 1, etc.
     return `${hour}:${minute} ${ampm}`;
   }
+
+
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -322,13 +345,14 @@ export default function GymsScreen() {
               distance={
                 userLocation
                   ? getDistance(
-                      userLocation.latitude,
-                      userLocation.longitude,
-                      gym.location.coordinates[1],
-                      gym.location.coordinates[0]
-                    ).toFixed(1) + " km"
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    gym.location.coordinates[1],
+                    gym.location.coordinates[0]
+                  ).toFixed(1) + " km"
                   : "N/A"
               }
+              logoUrl={fixUrl(gym.media?.logoUrl || gym.media?.frontPhotoUrl)}
               onPress={() => {
                 const [lon, lat] = gym.location.coordinates;
                 mapRef.current?.animateToRegion(

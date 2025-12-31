@@ -1,10 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
-import { Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+
 
 export default function TabsLayout() {
   const { user } = useAuth();
+  // console.log("Layout USER DATA →", data.user);
 
   if (!user) {
     return null; // or redirect to login
@@ -21,7 +22,17 @@ export default function TabsLayout() {
           ),
         }} 
       />
-      <Tabs.Screen 
+      <Tabs.Screen
+  name="plans"
+  options={{
+    title: "Plans",
+    tabBarIcon: ({ color, size }) => (
+      <Ionicons name="wallet-outline" size={size} color={color} />
+    ),
+  }}
+/>
+
+      {/* <Tabs.Screen 
         name="plans" 
         options={{ 
           title: 'Plans',
@@ -29,7 +40,7 @@ export default function TabsLayout() {
             <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }} 
-      />
+      /> */}
       <Tabs.Screen 
         name="gyms" 
         options={{ 

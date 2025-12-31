@@ -18,6 +18,7 @@ import { useLocalSearchParams } from "expo-router";
 import { router } from "expo-router";
 import { WebView } from "react-native-webview";
 import { getValidity } from "./gymProfile";
+import { fixUrl } from "../utils/imageHelper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
@@ -165,7 +166,7 @@ const PurchasePlanScreen = () => {
       console.log("Verification", verifyData);
 
       if (!verifyData.success) {
-        throw new Error("Payment verification failed");
+        throw new Error(verifyData.message || "Payment verification failed");
       }
 
       router.push({
@@ -177,9 +178,9 @@ const PurchasePlanScreen = () => {
           razorpay_order_id: orderId,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Verification Error", error);
-      Alert.alert("Error", "Payment verification failed");
+      Alert.alert("Error", error.message || "Payment verification failed");
     } finally {
       setLoading(false);
     }
@@ -257,7 +258,7 @@ const PurchasePlanScreen = () => {
           <View style={styles.gymInfo}>
             {gym.media?.mediaUrl && (
               <Image
-                source={{ uri: gym.media.mediaUrl }}
+                source={{ uri: fixUrl(gym.media?.logoUrl || gym.media?.frontPhotoUrl || gym.media?.mediaUrls?.[0]) }}
                 style={styles.gymImage}
               />
             )}

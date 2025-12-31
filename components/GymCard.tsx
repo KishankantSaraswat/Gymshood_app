@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -11,6 +11,7 @@ interface GymCardProps {
   openTime: string;
   closeTime: string;
   distance: string;
+  logoUrl: string;
   onPress?: () => void;
 }
 
@@ -22,6 +23,7 @@ export default function GymCard({
   openTime,
   closeTime,
   distance,
+  logoUrl,
   onPress,
 }: GymCardProps) {
   const router = useRouter();
@@ -35,7 +37,16 @@ export default function GymCard({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
-          <Text style={styles.name}>{name}</Text>
+          <View style={styles.headerTitleRow}>
+            {logoUrl ? (
+              <Image source={{ uri: logoUrl }} style={styles.logo} />
+            ) : (
+              <View style={styles.logoPlaceholder}>
+                <Ionicons name="fitness" size={20} color="#6C63FF" />
+              </View>
+            )}
+            <Text style={styles.name}>{name}</Text>
+          </View>
           <View style={styles.distanceBadge}>
             <Ionicons name="location" size={14} color="#fff" />
             <Text style={styles.distanceText}>{distance}</Text>
@@ -83,9 +94,9 @@ export default function GymCard({
           {/* Action button */}
           <TouchableOpacity
             style={styles.viewButton}
-            onPress={() =>{
-              console.log("id",id)
-              router.push({ pathname: "/gymProfile", params: {id} })
+            onPress={() => {
+              console.log("id", id)
+              router.push({ pathname: "/gymProfile", params: { id } })
             }
             }
           >
@@ -109,12 +120,35 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     overflow: "hidden",
-    marginHorizontal:16,
+    marginHorizontal: 16,
   },
   cardHeader: {
     padding: 16,
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "#fff",
+    backgroundColor: "#fff",
+  },
+  logoPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: "#fff",
+    justifyContent: "center",
     alignItems: "center",
   },
   name: {

@@ -1,32 +1,90 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
+import Constants from "expo-constants";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
   ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  SafeAreaView,
-  RefreshControl,
   Alert,
+  FlatList,
+  Image,
+  Linking,
   Modal,
   PermissionsAndroid,
   Platform,
-  Linking,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
   Camera,
   useCameraDevice,
   useCodeScanner,
 } from "react-native-vision-camera";
-import { useIsFocused, useFocusEffect } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import Constants from "expo-constants";
+import { fixUrl } from "../../utils/imageHelper";
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
+
+export function getGymStatus(shifts: any[], manualStatus: string) {
+  if (manualStatus && manualStatus !== "open") return { isOpen: false, message: "Closed" };
+
+  const now = new Date();
+  const currentDay = now.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  if (!shifts || shifts.length === 0) return { isOpen: false, message: "Closed" };
+
+  const activeShift = shifts.find((shift: any) => {
+    if (!shift.day || shift.day.toLowerCase() !== currentDay) return false;
+    const [startH, startM] = shift.startTime.split(":").map(Number);
+    const [endH, endM] = shift.endTime.split(":").map(Number);
+    const startTotal = startH * 60 + startM;
+    const endTotal = endH * 60 + endM;
+
+    if (endTotal > startTotal) {
+      return currentTime >= startTotal && currentTime < endTotal;
+    } else {
+      return currentTime >= startTotal || currentTime < endTotal;
+    }
+  });
+
+  if (activeShift) {
+    let genderLabel = activeShift.gender;
+    if (genderLabel === "male") genderLabel = "Men";
+    else if (genderLabel === "female") genderLabel = "Female";
+    else genderLabel = "Unisex";
+    return { isOpen: true, message: `Open for ${genderLabel}` };
+  }
+
+  return { isOpen: false, message: "Closed" };
+}
+
+export function isGymOpen(openTime: string, closeTime: string, status: string) {
+  if (status && status !== "open") return false;
+  if (!openTime || !closeTime) return false;
+
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  const [openHours, openMinutes] = openTime.split(":").map(Number);
+  const [closeHours, closeMinutes] = closeTime.split(":").map(Number);
+
+  const openTotalMinutes = openHours * 60 + openMinutes;
+  const closeTotalMinutes = closeHours * 60 + closeMinutes;
+
+  if (closeTotalMinutes > openTotalMinutes) {
+    // Normal case (e.g., 08:00 - 22:00)
+    return currentTime >= openTotalMinutes && currentTime < closeTotalMinutes;
+  } else {
+    // Overnight case (e.g., 22:00 - 06:00)
+    return currentTime >= openTotalMinutes || currentTime < closeTotalMinutes;
+  }
+}
 
 const COLORS = {
   primary: "#6C63FF",
@@ -90,13 +148,15 @@ export default function PlansScreen() {
     const enriched = await Promise.all(
       plans.map(async (plan) => {
         try {
-          const [planRes, gymRes] = await Promise.all([
+          const [planRes, gymRes, capacityRes] = await Promise.all([
             fetch(`${API_BASE_URL}gymdb/plans/gym/${plan.gymId}`),
             fetch(`${API_BASE_URL}gymdb/gyms?id=${plan.gymId}`),
+            fetch(`${API_BASE_URL}gymdb/gym/${plan.gymId}/active-capacity`),
           ]);
 
           const planData = await planRes.json();
           const gymData = await gymRes.json();
+          const capacityData = await capacityRes.json();
 
           const matchedPlan = planData?.plans?.find(
             (p: any) => p._id === plan.planId
@@ -111,7 +171,15 @@ export default function PlansScreen() {
             gymDetails: {
               name: matchedGym?.name || "Unnamed Gym",
               media: matchedGym?.media || null,
+              shifts: matchedGym?.shifts || [],
+              status: matchedGym?.status || "open",
             },
+            capacityInfo: capacityData?.success ? {
+              isOpen: capacityData.isOpen,
+              activeCount: capacityData.activeCount,
+              capacity: capacityData.capacity,
+              shiftInfo: capacityData.shiftInfo,
+            } : null,
           };
         } catch (error) {
           console.error("Failed to fetch plan/gym info:", error);
@@ -312,7 +380,7 @@ export default function PlansScreen() {
   };
 
 
-  function convertTo12Hour(time24:String) {
+  function convertTo12Hour(time24: String) {
     const [hourStr, minuteStr] = time24.split(':');
     let hour = parseInt(hourStr, 10);
     const minute = minuteStr.padStart(2, '0');
@@ -324,7 +392,18 @@ export default function PlansScreen() {
   const renderPlan = ({ item }: any) => {
     console.log("Plan", item);
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.9}
+        onPress={() => {
+          if (item.gymId) {
+            router.push({
+              pathname: "/gymProfile",
+              params: { id: item.gymId },
+            });
+          }
+        }}
+      >
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Plan: {item.planName}</Text>
           <View
@@ -350,7 +429,7 @@ export default function PlansScreen() {
         </View>
         <View style={styles.detailRow}>
           <Ionicons name="calendar" size={16} color={COLORS.primary} />
-          <Text style={styles.detailText}>Valid till {item.maxExpiryDate?.slice(0,10)+", "+convertTo12Hour(item.maxExpiryDate?.slice(12,-8))}</Text>
+          <Text style={styles.detailText}>Valid till {item.maxExpiryDate?.slice(0, 10) + ", " + convertTo12Hour(item.maxExpiryDate?.slice(12, -8))}</Text>
         </View>
 
         <View style={styles.detailRow}>
@@ -363,12 +442,89 @@ export default function PlansScreen() {
             <Image
               source={{
                 uri:
-                  item.gymDetails.media?.logoUrl ||
+                  fixUrl(item.gymDetails.media?.logoUrl) ||
                   "https://via.placeholder.com/50",
               }}
               style={styles.gymImage}
             />
-            <Text style={styles.gymName}>{item.gymDetails.name}</Text>
+            <View style={styles.gymNameContainer}>
+              <View>
+                <Text style={styles.gymName}>{item.gymDetails.name}</Text>
+                {item.gymDetails.shifts && (
+                  <View
+                    style={[
+                      styles.gymStatusBadge,
+                      {
+                        backgroundColor: getGymStatus(
+                          item.gymDetails.shifts,
+                          item.gymDetails.status
+                        ).isOpen
+                          ? "#E8F5E9"
+                          : "#FFEBEE",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.gymStatusText,
+                        {
+                          color: getGymStatus(
+                            item.gymDetails.shifts,
+                            item.gymDetails.status
+                          ).isOpen
+                            ? "#2E7D32"
+                            : "#C62828",
+                        },
+                      ]}
+                    >
+                      {
+                        getGymStatus(
+                          item.gymDetails.shifts,
+                          item.gymDetails.status
+                        ).message
+                      }
+                    </Text>
+                  </View>
+                )}
+
+                {/* Capacity Information */}
+                {item.capacityInfo && item.capacityInfo.isOpen && (
+                  <View style={styles.capacityContainer}>
+                    <View style={styles.capacityHeader}>
+                      <Ionicons name="people" size={14} color={COLORS.primary} />
+                      <Text style={styles.capacityText}>
+                        {item.capacityInfo.activeCount}/{item.capacityInfo.capacity} checked in
+                      </Text>
+                    </View>
+
+                    {/* Progress Bar */}
+                    <View style={styles.progressBarContainer}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          {
+                            width: `${Math.min((item.capacityInfo.activeCount / item.capacityInfo.capacity) * 100, 100)}%`,
+                            backgroundColor:
+                              (item.capacityInfo.activeCount / item.capacityInfo.capacity) >= 0.9
+                                ? "#F44336"
+                                : (item.capacityInfo.activeCount / item.capacityInfo.capacity) >= 0.7
+                                  ? "#FFA000"
+                                  : "#4CAF50"
+                          }
+                        ]}
+                      />
+                    </View>
+
+                    {/* Shift Time */}
+                    {item.capacityInfo.shiftInfo && (
+                      <Text style={styles.shiftTimeText}>
+                        {convertTo12Hour(item.capacityInfo.shiftInfo.startTime)} - {convertTo12Hour(item.capacityInfo.shiftInfo.endTime)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
         )}
 
@@ -407,7 +563,7 @@ export default function PlansScreen() {
             <Text style={styles.checkInButtonText}>Check In</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -484,36 +640,53 @@ export default function PlansScreen() {
       )}
     </View>
   );
-  const QRView = () => (
-    <View style={styles.cameraContainer}>
-      <Camera
-        style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={isFocused && !!activeCheckInPlan}
-        codeScanner={codeScanner}
-      />
-
-      <View style={styles.scannerOverlay}>
-        <View style={styles.scannerFrame}>
-          <View style={styles.cornerTL} />
-          <View style={styles.cornerTR} />
-          <View style={styles.cornerBL} />
-          <View style={styles.cornerBR} />
+  const QRView = () => {
+    if (!device) {
+      return (
+        <View style={[styles.cameraContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ color: 'white' }}>No camera device found</Text>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => setActiveCheckInPlan(null)}
+          >
+            <Ionicons name="close" size={24} color="white" />
+          </TouchableOpacity>
         </View>
-        <Text style={styles.scannerText}>Align QR code within frame</Text>
-        <Text style={styles.scannerSubtext}>
-          Scanning for {activeCheckInPlan?.gymDetails?.name}
-        </Text>
-      </View>
+      );
+    }
 
-      <TouchableOpacity
-        style={styles.cancelButton}
-        onPress={() => setActiveCheckInPlan(null)}
-      >
-        <Ionicons name="close" size={24} color="white" />
-      </TouchableOpacity>
-    </View>
-  );
+    return (
+      <View style={styles.cameraContainer}>
+        <Camera
+          style={StyleSheet.absoluteFill}
+          device={device}
+          isActive={isFocused && !!activeCheckInPlan}
+          codeScanner={codeScanner}
+          audio={false}
+        />
+
+        <View style={styles.scannerOverlay}>
+          <View style={styles.scannerFrame}>
+            <View style={styles.cornerTL} />
+            <View style={styles.cornerTR} />
+            <View style={styles.cornerBL} />
+            <View style={styles.cornerBR} />
+          </View>
+          <Text style={styles.scannerText}>Align QR code within frame</Text>
+          <Text style={styles.scannerSubtext}>
+            Scanning for {activeCheckInPlan?.gymDetails?.name}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={() => setActiveCheckInPlan(null)}
+        >
+          <Ionicons name="close" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -802,9 +975,27 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     marginRight: 10,
   },
+  gymNameContainer: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   gymName: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  gymStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+  },
+  gymStatusText: {
+    fontSize: 10,
+    fontWeight: "bold",
   },
   emptyState: {
     alignItems: "center",
@@ -921,5 +1112,38 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  capacityContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+  },
+  capacityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  capacityText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginLeft: 6,
+    fontWeight: "600",
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  shiftTimeText: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    fontStyle: "italic",
   },
 });

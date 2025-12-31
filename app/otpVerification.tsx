@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, TextInput, Button, Alert, StyleSheet, Text  } from "react-native";
+import { View, TextInput, Button, Alert, StyleSheet, Text } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import { useAuth } from "../hooks/useAuth"; // adjust the path
 import Constants from "expo-constants";
@@ -14,34 +14,55 @@ const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
 
 const OtpVerificationScreen = () => {
   const [otp, setOtp] = useState("");
-    const router = useRouter();
+  const router = useRouter();
   const route = useRoute();
   const { email } = route.params as { email: string };
   const { login } = useAuth();
 
   const handleVerify = async () => {
+    console.log("🔐 Frontend: Starting OTP Verification");
+    console.log("📧 Email:", email);
+    console.log("🔢 OTP entered:", otp);
+
     try {
-      const registrationSessionId = AsyncStorage.getItem('registrationSessionId');
+      const registrationSessionId = await AsyncStorage.getItem('registrationSessionId');
+      console.log("🆔 Session ID from storage:", registrationSessionId);
+      console.log("🔗 API URL:", `${API_BASE_URL}auth/verify-otp`);
+
+      const payload = { email, otp, registrationSessionId };
+      console.log("📦 Sending payload:", payload);
+
       const response = await fetch(`${API_BASE_URL}auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp, registrationSessionId }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("OTP verification failed");
+      console.log("📡 Response status:", response.status);
+      console.log("📡 Response ok:", response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Error response:", errorText);
+        throw new Error("OTP verification failed");
+      }
 
       const result = await response.json();
+      console.log("✅ Success response:", result);
+
       if (result.success) {
         Alert.alert("Success", "Registration Successfull");
-        router.push("/login"); // or however your system logs in
+        router.push("/login");
       }
     } catch (err: any) {
+      console.error("❌ Verification error:", err);
+      console.error("❌ Error message:", err.message);
       Alert.alert("Error", err.message);
     }
   };
 
   return (
-<View style={styles.container}>
+    <View style={styles.container}>
       <Text style={styles.heading}>Verify OTP</Text>
 
       <Text style={styles.label}>Enter the OTP sent to your email:</Text>

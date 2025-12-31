@@ -24,6 +24,18 @@ export default ({ config }) => ({
     },
     edgeToEdgeEnabled: true,
     package: "com.mohdqounane.gymshood",
+    usesCleartextTraffic: true,
+    permissions: [
+      "android.permission.CAMERA",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_COARSE_LOCATION"
+    ],
+    config: {
+      googleMaps: {
+        apiKey: "AIzaSyB-g-3ZZcBATKsPJgAywCk7CYI6CJnKD8s"
+      }
+    }
   },
 
   web: {
@@ -36,15 +48,25 @@ export default ({ config }) => ({
     "expo-router",
     "expo-web-browser",
     [
-      "expo-splash-screen",
+      "react-native-vision-camera",
       {
-        image: "./assets/images/logo.png",
-        imageWidth: 200,
-        resizeMode: "contain",
-        backgroundColor: "#ffffff",
-      },
+        "cameraPermissionText": "GymHood needs access to your camera to scan QR codes for check-in.",
+        "microphonePermissionText": "GymHood needs access to your microphone (required by library, but not used for scanning)."
+      }
     ],
+    ["expo-splash-screen", {
+      image: "./assets/images/logo.png",
+      imageWidth: 300,
+      resizeMode: "contain",
+      backgroundColor: "#002147",
+    }],
+    ["expo-build-properties", {
+      android: {
+        usesCleartextTraffic: true
+      }
+    }]
   ],
+
 
   experiments: {
     typedRoutes: true,
@@ -53,7 +75,7 @@ export default ({ config }) => ({
   extra: {
     API_BASE_URL: process.env.API_BASE_URL || "",
     eas: {
-      projectId: "4e558ab6-f247-4371-b6d0-a6aea6740924"
+      projectId: "8d80bc22-7a77-40ba-bc9b-a85312f2d254"
     },
   },
 });
