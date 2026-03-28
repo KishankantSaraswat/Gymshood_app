@@ -10,8 +10,10 @@ import {
   Image,
   TextInput,
   Linking,
+  Modal,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import Constants from "expo-constants";
 import { useLocalSearchParams } from "expo-router";
@@ -39,14 +41,18 @@ const PurchasePlanScreen = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [cashRequestData, setCashRequestData] = useState<any>(null);
 
   useEffect(() => {
     const getUserDetails = async () => {
       const localData = await AsyncStorage.getItem("userInfo");
-      const data = JSON.parse(localData);
-      if (data) {
-        setName(data.name);
-        setEmail(data.email);
+      if (localData) {
+        const data = JSON.parse(localData);
+        if (data) {
+          setName(data.name);
+          setEmail(data.email);
+        }
       }
     };
     getUserDetails();
@@ -59,7 +65,22 @@ const PurchasePlanScreen = () => {
     Linking.openURL("https://gymshood.blogspot.com/p/terms-conditions.html");
   };
 
-  const handlePurchase = async () => {
+  const discountedPrice = plan.discountPercent > 0
+    ? Math.round(plan.price * (1 - plan.discountPercent / 100))
+    : plan.price;
+
+  const handlePurchase = async (mode: 'online' | 'cash' = 'online') => {
+    console.log('\n========== BUY PLAN - HANDLE PURCHASE ==========');
+    console.log('[BuyPlan] Payment Mode:', mode);
+    console.log('[BuyPlan] Plan Details:', {
+      planId: plan._id,
+      planName: plan.name,
+      planPrice: plan.price,
+      discountedPrice,
+      gymId: gym._id,
+      gymName: gym.name
+    });
+
     if (!agreeTerms) {
       Alert.alert(
         "Terms Required",
@@ -78,21 +99,45 @@ const PurchasePlanScreen = () => {
     setLoading(true);
 
     try {
+      const requestPayload = {
+        amount: discountedPrice * 100,
+        currency: "INR",
+        receipt: `plan_${plan._id}_${Date.now()}`,
+        planId: plan._id,
+        paymentMode: mode
+      };
+
+      console.log('[BuyPlan] API Request Payload:', requestPayload);
+      console.log('[BuyPlan] API Endpoint:', `${API_BASE_URL}gymdb/plans/purchase`);
+
       const res = await fetch(`${API_BASE_URL}gymdb/plans/purchase`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          amount: plan.price * 100,
-          currency: "INR",
-          receipt: `plan_${plan._id}_${Date.now()}`,
-          planId: plan._id,
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       const order = await res.json();
-      console.log("order", order);
+      console.log('[BuyPlan] API Response:', {
+        success: order.success,
+        isCash: order.isCash,
+        message: order.message,
+        walletTransactionId: order.walletTransactionId
+      });
+
+      if (mode === 'cash') {
+        if (!order.success) {
+          console.error('[BuyPlan] Cash payment failed:', order.message);
+          throw new Error(order.message || "Failed to initiate cash request");
+        }
+        console.log('[BuyPlan] Cash payment request successful, showing success modal');
+        setCashRequestData(order);
+        setShowSuccessModal(true);
+        setLoading(false);
+        console.log('========== BUY PLAN - CASH PAYMENT SUCCESS ==========\n');
+        return;
+      }
 
       if (!order.success) throw new Error("Failed to create Razorpay order");
       setWalletTransactionId(order.walletTransactionId);
@@ -118,7 +163,8 @@ const PurchasePlanScreen = () => {
       setPaymentData(paymentData);
       setShowWebView(true);
     } catch (error: any) {
-      console.error("Payment Error", error);
+      console.error("[BuyPlan] Payment Error:", error);
+      console.log('========== BUY PLAN - FAILED ==========\n');
       Alert.alert("Payment Error", error.message || "Something went wrong");
       setLoading(false);
     }
@@ -239,7 +285,7 @@ const PurchasePlanScreen = () => {
   };
 
   return (
-    <>
+    <SafeAreaView style={styles.safeArea}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
@@ -272,20 +318,28 @@ const PurchasePlanScreen = () => {
 
           <View style={styles.planDetails}>
             <Text style={styles.planName}>{plan.name}</Text>
-            <View style={styles.priceRow}>
-              <Text style={styles.planPrice}>₹{plan.price}</Text>
-              <Text style={styles.planDuration}>
-                for {plan.planType} valid for next {getValidity(plan.planType)}{" "}
-                days
-              </Text>
+
+            <View style={styles.priceContainer}>
+              {plan.discountPercent > 0 ? (
+                <View style={styles.priceRow}>
+                  <Text style={styles.discountedPriceText}>₹{discountedPrice}</Text>
+                  <Text style={styles.originalPriceText}>₹{plan.price}</Text>
+                  <View style={styles.discountBadgeSmall}>
+                    <Text style={styles.discountTextSmall}>{plan.discountPercent}% OFF</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.planPrice}>₹{plan.price}</Text>
+              )}
             </View>
-            {plan.discountPercent > 0 && (
-              <View style={styles.discountBadge}>
-                <Text style={styles.discountText}>
-                  {plan.discountPercent}% OFF
-                </Text>
+
+            <View style={styles.validityInfo}>
+              <View style={styles.validityLabel}>
+                <Ionicons name="calendar-outline" size={16} color="#6C63FF" />
+                <Text style={styles.validityText}>For {plan.planType}</Text>
               </View>
-            )}
+              <Text style={styles.validitySubtext}>Valid for {getValidity(plan.planType)} days after activation</Text>
+            </View>
           </View>
         </View>
 
@@ -359,22 +413,66 @@ const PurchasePlanScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Purchase Button */}
-        <TouchableOpacity
-          style={styles.purchaseButton}
-          onPress={handlePurchase}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.purchaseButtonText}>Confirm Payment</Text>
-              <Text style={styles.purchaseButtonAmount}>₹{plan.price}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {/* Purchase Buttons */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.purchaseButton, styles.cashButton]}
+            onPress={() => handlePurchase('cash')}
+            disabled={loading}
+          >
+            <MaterialIcons name="payments" size={20} color="#6C63FF" style={{ marginRight: 6 }} />
+            <Text style={[styles.purchaseButtonText, { color: '#6C63FF' }]}>Pay Cash</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.purchaseButton, styles.onlineButton]}
+            onPress={() => handlePurchase('online')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <View style={styles.buttonTextContainer}>
+                <Text style={styles.purchaseButtonText}>Buy Now</Text>
+                <Text style={styles.purchaseButtonAmount}>₹{discountedPrice}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Success Modal for Cash Request */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <FontAwesome5 name="clock" size={40} color="#FFA500" />
+            </View>
+            <Text style={styles.modalTitle}>Request Sent!</Text>
+            <Text style={styles.modalMessage}>
+              Your request to pay by cash has been sent to the gym partner.
+              Please pay ₹{discountedPrice} at the gym counter to activate your membership.
+            </Text>
+            <Text style={styles.modalSubMessage}>
+              Status: Pending Approval
+            </Text>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.replace('/(tabs)' as any); // Correcting route to the main tabs entry
+              }}
+            >
+              <Text style={styles.modalButtonText}>Okay, Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {showWebView && paymentData && (
         <View style={StyleSheet.absoluteFill}>
@@ -403,17 +501,21 @@ const PurchasePlanScreen = () => {
           </TouchableOpacity>
         </View>
       )}
-    </>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
   contentContainer: {
-    paddingBottom: 30,
+    paddingBottom: 100, // Increased for bottom button safety
   },
   header: {
     flexDirection: "row",
@@ -471,33 +573,73 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   planName: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 5,
+    marginBottom: 12,
+  },
+  priceContainer: {
+    marginBottom: 15,
   },
   priceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  planPrice: {
-    fontSize: 24,
+  originalPriceText: {
+    fontSize: 16,
+    color: "#999",
+    textDecorationLine: "line-through",
+  },
+  discountedPriceText: {
+    fontSize: 32,
     fontWeight: "bold",
     color: "#6C63FF",
-    marginRight: 10,
   },
-  planDuration: {
+  planPrice: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#6C63FF",
+  },
+  discountBadgeSmall: {
+    backgroundColor: "#FFE8E8",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  discountTextSmall: {
+    fontSize: 12,
+    color: "#FF5252",
+    fontWeight: "bold",
+  },
+  validityInfo: {
+    backgroundColor: '#F8F9FE',
+    padding: 12,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#6C63FF',
+  },
+  validityLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  validityText: {
     fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    textTransform: 'capitalize',
+  },
+  validitySubtext: {
+    fontSize: 13,
     color: "#666",
+    marginLeft: 22,
   },
   discountBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#FFE8E8",
-    borderRadius: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginTop: 5,
+    // Hidden as we use discountBadgeSmall now
+    display: 'none',
   },
   discountText: {
     fontSize: 12,
@@ -553,30 +695,51 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textDecorationLine: "underline",
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 15,
+    gap: 10,
+    marginBottom: 20,
+  },
   purchaseButton: {
-    backgroundColor: "#6C63FF",
-    borderRadius: 10,
-    padding: 18,
-    marginHorizontal: 20,
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#6C63FF",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 6,
+    minHeight: 64,
+  },
+  onlineButton: {
+    backgroundColor: "#6C63FF",
+  },
+  cashButton: {
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#6C63FF",
   },
   purchaseButtonText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
-    marginRight: 10,
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: 'center',
+  },
+  buttonTextContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   purchaseButtonAmount: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "bold",
+    marginTop: 2,
+    opacity: 0.9,
   },
   loadingOverlay: {
     position: "absolute",
@@ -600,6 +763,63 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 1000,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 25,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 340,
+    elevation: 5
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFF5E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 15,
+    lineHeight: 22
+  },
+  modalSubMessage: {
+    fontSize: 14,
+    color: '#FFA500',
+    fontWeight: '600',
+    marginBottom: 25
+  },
+  modalButton: {
+    backgroundColor: '#6C63FF',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    width: '100%'
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center'
+  }
 });
 
 export default PurchasePlanScreen;

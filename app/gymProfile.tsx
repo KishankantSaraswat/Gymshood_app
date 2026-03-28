@@ -17,7 +17,9 @@ import {
   Linking,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 // Removed TabView import as we're implementing custom tabs
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
@@ -25,15 +27,19 @@ const { width } = Dimensions.get("window");
 import { fixUrl } from "../utils/imageHelper";
 
 export function getValidity(planDuration: string) {
-  if (planDuration.trim() === "1 day") {
+  const duration = planDuration ? planDuration.trim().toLowerCase() : "";
+  if (duration === "1 day") {
     return 7;
-  } else if (planDuration.trim() === "7 days") {
+  } else if (duration === "7 days") {
     return 30;
-  } else if (planDuration.trim() === "15 days") {
+  } else if (duration === "15 days") {
     return 45;
-  } else if (planDuration.trim() === "1 month") {
+  } else if (duration === "1 month" || duration === "monthly") {
     return 90;
+  } else if (duration === "1 year" || duration === "yearly") {
+    return 365;
   }
+  return 0; // Fallback
 }
 
 
@@ -229,7 +235,16 @@ const PlanTab = ({ plans, gym }: { plans: any; gym: any }) => {
         <View key={index} style={styles.planItem}>
           <View style={styles.planHeader}>
             <Text style={styles.planName}>{plan.name}</Text>
-            <Text style={styles.planPrice}>₹{plan.price}</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              {plan.discountPercent > 0 ? (
+                <>
+                  <Text style={[styles.planPrice, { fontSize: 14, color: '#999', textDecorationLine: 'line-through' }]}>₹{plan.price}</Text>
+                  <Text style={styles.planPrice}>₹{Math.round(plan.price * (1 - plan.discountPercent / 100))}</Text>
+                </>
+              ) : (
+                <Text style={styles.planPrice}>₹{plan.price}</Text>
+              )}
+            </View>
           </View>
           <Text style={styles.planDuration}>
             {plan.planType} valid for {getValidity(plan.planType)} days
@@ -809,112 +824,119 @@ export default function GymProfileScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
-    >
-      <ScrollView
-        style={styles.mainScrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.mainScrollContent}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#6C63FF" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
-        {/* Profile Header */}
-        <View style={styles.profileHeader}>
-          <TouchableOpacity
-            onPress={() => {
-              if (gym.media?.logoUrl) {
-                router.push({
-                  pathname: "/fullScreenImage",
-                  params: { imageUrl: gym.media.logoUrl },
-                });
-              }
-            }}
-          >
-            <Image
-              source={
-                gym.media?.logoUrl
-                  ? {
-                    uri: fixUrl(gym.media.logoUrl)
-                  }
-                  : require("../assets/images/favicon.png")
-              }
-              style={styles.profileImage}
-              onError={(e) => console.log(`Failed to load logo: ${gym.media?.logoUrl}`, e.nativeEvent.error)}
-            />
-          </TouchableOpacity>
-
-          <Text style={styles.gymName}>{gym.name}</Text>
-          <Text style={styles.gymSlogan}>{gym.gymslogan}</Text>
-
-          <View style={styles.headerBottomRow}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.ratingText}>
-                {gym.avgRating.toFixed(1) || "0"}
-              </Text>
-            </View>
-
-            {gym.location?.coordinates && (
-              <TouchableOpacity
-                style={styles.navigationButton}
-                onPress={() => {
-                  const [longitude, latitude] = gym.location.coordinates;
-                  const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-                  Linking.openURL(url).catch((err) => {
-                    Alert.alert("Error", "Could not open Google Maps");
-                    console.error("Failed to open maps:", err);
+        <ScrollView
+          style={styles.mainScrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.mainScrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Profile Header */}
+          <View style={styles.profileHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                if (gym.media?.logoUrl) {
+                  router.push({
+                    pathname: "/fullScreenImage",
+                    params: { imageUrl: gym.media.logoUrl },
                   });
-                }}
-              >
-                <Ionicons name="navigate" size={20} color="#fff" />
-                <Text style={styles.navigationButtonText}>Navigate</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+                }
+              }}
+            >
+              <Image
+                source={
+                  gym.media?.logoUrl
+                    ? {
+                      uri: fixUrl(gym.media.logoUrl)
+                    }
+                    : require("../assets/images/favicon.png")
+                }
+                style={styles.profileImage}
+                onError={(e) => console.log(`Failed to load logo: ${gym.media?.logoUrl}`, e.nativeEvent.error)}
+              />
+            </TouchableOpacity>
 
-        {/* Custom Tab Bar */}
-        <View style={styles.customTabBar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabBarContent}
-          >
-            {routes.map((route, tabIndex) => (
-              <TouchableOpacity
-                key={route.key}
-                style={[
-                  styles.customTab,
-                  index === tabIndex && styles.activeTab,
-                ]}
-                onPress={() => setIndex(tabIndex)}
-              >
-                <Text
-                  style={[
-                    styles.customTabLabel,
-                    index === tabIndex && styles.activeTabLabel,
-                  ]}
-                >
-                  {route.title}
+            <Text style={styles.gymName}>{gym.name}</Text>
+            <Text style={styles.gymSlogan}>{gym.gymslogan}</Text>
+
+            <View style={styles.headerBottomRow}>
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.ratingText}>
+                  {gym.avgRating.toFixed(1) || "0"}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {/* <View style={[styles.tabIndicator, { left: (width / routes.length) * index }]} /> */}
-        </View>
+              </View>
 
-        {/* Tab Content */}
-        <View style={styles.tabContentContainer}>
-          {renderScene({ route: routes[index] })}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+              {gym.location?.coordinates && (
+                <TouchableOpacity
+                  style={styles.navigationButton}
+                  onPress={() => {
+                    const [longitude, latitude] = gym.location.coordinates;
+                    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+                    Linking.openURL(url).catch((err) => {
+                      Alert.alert("Error", "Could not open Google Maps");
+                      console.error("Failed to open maps:", err);
+                    });
+                  }}
+                >
+                  <Ionicons name="navigate" size={20} color="#fff" />
+                  <Text style={styles.navigationButtonText}>Navigate</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Custom Tab Bar */}
+          <View style={styles.customTabBar}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabBarContent}
+            >
+              {routes.map((route, tabIndex) => (
+                <TouchableOpacity
+                  key={route.key}
+                  style={[
+                    styles.customTab,
+                    index === tabIndex && styles.activeTab,
+                  ]}
+                  onPress={() => setIndex(tabIndex)}
+                >
+                  <Text
+                    style={[
+                      styles.customTabLabel,
+                      index === tabIndex && styles.activeTabLabel,
+                    ]}
+                  >
+                    {route.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {/* <View style={[styles.tabIndicator, { left: (width / routes.length) * index }]} /> */}
+          </View>
+
+          {/* Tab Content */}
+          <View style={styles.tabContentContainer}>
+            {renderScene({ route: routes[index] })}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   container: {
     flex: 1,
     backgroundColor: "#fff",
@@ -1029,7 +1051,6 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: "#6C63FF",
     width: width / 6,
-    transition: "left 0.3s ease",
   },
   tabLabel: {
     fontSize: 12,

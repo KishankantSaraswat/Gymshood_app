@@ -52,7 +52,7 @@ const OtpVerificationScreen = () => {
 
       if (result.success) {
         Alert.alert("Success", "Registration Successfull");
-        router.push("/login");
+        router.push("/selectGym");
       }
     } catch (err: any) {
       console.error("❌ Verification error:", err);

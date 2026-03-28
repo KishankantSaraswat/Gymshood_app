@@ -54,8 +54,8 @@ const PaymentConfirmationScreen = () => {
               {paymentMethod === "card"
                 ? "Credit/Debit Card"
                 : paymentMethod === "upi"
-                ? "UPI Payment"
-                : "Net Banking"}
+                  ? "UPI Payment"
+                  : "Net Banking"}
             </Text>
           </View>
           <View style={styles.detailRow}>
@@ -120,7 +120,7 @@ const PaymentConfirmationScreen = () => {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => router.push("/")}
+          onPress={() => router.replace("/(tabs)")}
         >
           <Text style={styles.secondaryButtonText}>Back to Home</Text>
         </TouchableOpacity>

@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   SafeAreaView,
   RefreshControl,
+  Image,
+  StatusBar,
 } from "react-native";
 import * as Location from "expo-location";
 import MapView, { Marker } from "react-native-maps";
@@ -18,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import GymCard from "../../components/GymCard";
 import Constants from "expo-constants";
+import { useGymSelection } from "../../hooks/useGymSelection";
+import { router } from "expo-router";
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
 import { fixUrl } from "../../utils/imageHelper";
@@ -76,6 +80,7 @@ const getDistance = (
 
 export default function GymsScreen() {
   console.log("Rendering Gyms Screen");
+  const { selectedGym, hasSelectedGym } = useGymSelection();
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -87,6 +92,7 @@ export default function GymsScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const mapRef = useRef<MapView>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGymDetails, setSelectedGymDetails] = useState<Gym | null>(null);
 
   const fetchData = async () => {
     try {
@@ -103,7 +109,14 @@ export default function GymsScreen() {
     try {
       const res = await fetch(`${API_BASE_URL}gymdb/gyms`);
       const data = await res.json();
-      if (data.success) setGyms(data.gyms);
+      if (data.success) {
+        setGyms(data.gyms);
+        // If user has selected a gym, find its details
+        if (hasSelectedGym && selectedGym) {
+          const gymDetails = data.gyms.find((gym: Gym) => gym._id === selectedGym.id);
+          setSelectedGymDetails(gymDetails || null);
+        }
+      }
     } catch (error) {
       console.error("Error fetching gyms:", error);
     }
@@ -124,7 +137,7 @@ export default function GymsScreen() {
     useCallback(() => {
       setLoading(true);
       fetchData();
-    }, [])
+    }, [hasSelectedGym, selectedGym])
   );
 
   const onRefresh = () => {
@@ -200,6 +213,7 @@ export default function GymsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.primary} />
       <ScrollView
         style={styles.content}
         refreshControl={
@@ -221,152 +235,225 @@ export default function GymsScreen() {
           <View style={styles.avatar}>
             <Ionicons name="fitness" size={40} color="#fff" />
           </View>
-          <Text style={styles.headerName}>Find Nearby Gyms</Text>
+          <Text style={styles.headerName}>
+            {hasSelectedGym ? "Your Gym" : "Find Nearby Gyms"}
+          </Text>
           <Text style={styles.headerEmail}>
-            Discover fitness centers near you
+            {hasSelectedGym 
+              ? `Welcome to ${selectedGym?.name || "your gym"}`
+              : "Discover fitness centers near you"
+            }
           </Text>
         </LinearGradient>
 
-        {/* Search and Filter Section */}
-        <View style={styles.filterContainer}>
-          <View
-            style={[
-              styles.searchInput,
-              searchFocused && styles.searchInputFocused,
-            ]}
-          >
-            <Ionicons
-              name="search"
-              size={20}
-              color={COLORS.textSecondary}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={styles.searchTextInput}
-              placeholder="Search gyms..."
-              placeholderTextColor={COLORS.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-            />
-          </View>
-
-          <View style={styles.rangeSelector}>
-            <Ionicons name="location" size={20} color={COLORS.primary} />
-            <Text style={styles.rangeText}>Within</Text>
-            <TextInput
-              style={styles.rangeInput}
-              keyboardType="numeric"
-              value={range}
-              onChangeText={setRange}
-              placeholder="10"
-            />
-            <Text style={styles.rangeText}>km</Text>
-          </View>
-        </View>
-
-        {/* Map Section */}
-        {userLocation && (
-          <View style={styles.mapContainer}>
-            <MapView
-              ref={mapRef}
-              style={styles.map}
-              initialRegion={{
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-              customMapStyle={mapStyle}
-            >
-              <Marker
-                coordinate={userLocation}
-                title="You are here"
-                pinColor={COLORS.primary}
-              />
-
-              {filteredGyms.map((gym) => {
-                const [lon, lat] = gym.location.coordinates;
-                return (
-                  <Marker
-                    key={gym._id}
-                    coordinate={{ latitude: lat, longitude: lon }}
-                    title={gym.name}
-                    description={gym.location.address}
+        {/* Show Selected Gym Profile or All Gyms */}
+        {hasSelectedGym && selectedGymDetails ? (
+          <View style={styles.selectedGymContainer}>
+            <View style={styles.gymProfileCard}>
+              <View style={styles.gymProfileHeader}>
+                {selectedGymDetails.media?.logoUrl || selectedGymDetails.media?.frontPhotoUrl ? (
+                  <Image
+                    source={{ uri: fixUrl(selectedGymDetails.media?.logoUrl || selectedGymDetails.media?.frontPhotoUrl) }}
+                    style={styles.gymProfileImage}
                   />
-                );
-              })}
-            </MapView>
-            <TouchableOpacity
-              style={styles.locationButton}
-              onPress={focusOnUserLocation}
-            >
-              <Ionicons name="locate" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
-          </View>
-        )}
+                ) : (
+                  <View style={styles.gymProfileImagePlaceholder}>
+                    <Ionicons name="fitness" size={40} color={COLORS.primary} />
+                  </View>
+                )}
+                <View style={styles.gymProfileInfo}>
+                  <Text style={styles.gymProfileName}>{selectedGymDetails.name}</Text>
+                  <Text style={styles.gymProfileAddress}>{selectedGymDetails.location.address}</Text>
+                  <View style={styles.gymProfileMeta}>
+                    <View style={styles.ratingContainer}>
+                      <Ionicons name="star" size={16} color="#FFD700" />
+                      <Text style={styles.ratingText}>
+                        {selectedGymDetails.avgRating?.toFixed(1) || "0.0"}
+                      </Text>
+                    </View>
+                    <View style={styles.verifiedBadge}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                      <Text style={styles.verifiedText}>Verified</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              
+              <View style={styles.gymProfileDetails}>
+                <View style={styles.detailItem}>
+                  <Ionicons name="time-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.detailText}>
+                    {convertTo12Hour(selectedGymDetails.openTime)} - {convertTo12Hour(selectedGymDetails.closeTime)}
+                  </Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Ionicons name="location-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.detailText}>{selectedGymDetails.location.address}</Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.detailText}>{selectedGymDetails.about}</Text>
+                </View>
+              </View>
 
-        {/* Results Section */}
-        <View style={styles.resultsHeader}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="list" size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Available Gyms</Text>
-          </View>
-          <Text style={styles.resultsCount}>{filteredGyms.length} found</Text>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color={COLORS.primary}
-            style={styles.loader}
-          />
-        ) : filteredGyms.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="sad-outline" size={48} color="#9E9E9E" />
-            <Text style={styles.emptyText}>No gyms found</Text>
-            <Text style={styles.emptySubtext}>
-              {searchQuery
-                ? "Try a different search"
-                : "Adjust your range or location"}
-            </Text>
+              <TouchableOpacity
+                style={styles.viewFullProfileButton}
+                onPress={() => {
+                  router.push({
+                    pathname: "/gymProfile",
+                    params: { id: selectedGymDetails._id }
+                  });
+                }}
+              >
+                <Text style={styles.viewFullProfileButtonText}>View Full Profile</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
-          filteredGyms.map((gym) => (
-            <GymCard
-              key={gym._id}
-              id={gym._id}
-              name={gym.name}
-              address={gym.location.address}
-              about={gym.about}
-              openTime={convertTo12Hour(gym.openTime)}
-              closeTime={convertTo12Hour(gym.closeTime)}
-              distance={
-                userLocation
-                  ? getDistance(
-                    userLocation.latitude,
-                    userLocation.longitude,
-                    gym.location.coordinates[1],
-                    gym.location.coordinates[0]
-                  ).toFixed(1) + " km"
-                  : "N/A"
-              }
-              logoUrl={fixUrl(gym.media?.logoUrl || gym.media?.frontPhotoUrl)}
-              onPress={() => {
-                const [lon, lat] = gym.location.coordinates;
-                mapRef.current?.animateToRegion(
-                  {
-                    latitude: lat,
-                    longitude: lon,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  },
-                  1000
-                );
-              }}
-            />
-          ))
+          <>
+            {/* Search and Filter Section */}
+            <View style={styles.filterContainer}>
+              <View
+                style={[
+                  styles.searchInput,
+                  searchFocused && styles.searchInputFocused,
+                ]}
+              >
+                <Ionicons
+                  name="search"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={styles.searchTextInput}
+                  placeholder="Search gyms..."
+                  placeholderTextColor={COLORS.textSecondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                />
+              </View>
+
+              <View style={styles.rangeSelector}>
+                <Ionicons name="location" size={20} color={COLORS.primary} />
+                <Text style={styles.rangeText}>Within</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  keyboardType="numeric"
+                  value={range}
+                  onChangeText={setRange}
+                  placeholder="10"
+                />
+                <Text style={styles.rangeText}>km</Text>
+              </View>
+            </View>
+
+            {/* Map Section */}
+            {userLocation && (
+              <View style={styles.mapContainer}>
+                <MapView
+                  ref={mapRef}
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  }}
+                  customMapStyle={mapStyle}
+                >
+                  <Marker
+                    coordinate={userLocation}
+                    title="You are here"
+                    pinColor={COLORS.primary}
+                  />
+
+                  {filteredGyms.map((gym) => {
+                    const [lon, lat] = gym.location.coordinates;
+                    return (
+                      <Marker
+                        key={gym._id}
+                        coordinate={{ latitude: lat, longitude: lon }}
+                        title={gym.name}
+                        description={gym.location.address}
+                      />
+                    );
+                  })}
+                </MapView>
+                <TouchableOpacity
+                  style={styles.locationButton}
+                  onPress={focusOnUserLocation}
+                >
+                  <Ionicons name="locate" size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Results Section */}
+            <View style={styles.resultsHeader}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="list" size={20} color={COLORS.primary} />
+                <Text style={styles.sectionTitle}>Available Gyms</Text>
+              </View>
+              <Text style={styles.resultsCount}>{filteredGyms.length} found</Text>
+            </View>
+
+            {loading ? (
+              <ActivityIndicator
+                size="large"
+                color={COLORS.primary}
+                style={styles.loader}
+              />
+            ) : filteredGyms.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="sad-outline" size={48} color="#9E9E9E" />
+                <Text style={styles.emptyText}>No gyms found</Text>
+                <Text style={styles.emptySubtext}>
+                  {searchQuery
+                    ? "Try a different search"
+                    : "Adjust your range or location"}
+                </Text>
+              </View>
+            ) : (
+              filteredGyms.map((gym) => (
+                <GymCard
+                  key={gym._id}
+                  id={gym._id}
+                  name={gym.name}
+                  address={gym.location.address}
+                  about={gym.about}
+                  openTime={convertTo12Hour(gym.openTime)}
+                  closeTime={convertTo12Hour(gym.closeTime)}
+                  distance={
+                    userLocation
+                      ? getDistance(
+                          userLocation.latitude,
+                          userLocation.longitude,
+                          gym.location.coordinates[1],
+                          gym.location.coordinates[0]
+                        ).toFixed(1) + " km"
+                      : "N/A"
+                  }
+                  logoUrl={fixUrl(gym.media?.logoUrl || gym.media?.frontPhotoUrl)}
+                  onPress={() => {
+                    const [lon, lat] = gym.location.coordinates;
+                    mapRef.current?.animateToRegion(
+                      {
+                        latitude: lat,
+                        longitude: lon,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      },
+                      1000
+                    );
+                  }}
+                />
+              ))
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -697,5 +784,109 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
     marginTop: 5,
+  },
+  // Selected Gym Profile Styles
+  selectedGymContainer: {
+    padding: 16,
+  },
+  gymProfileCard: {
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  gymProfileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  gymProfileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
+  },
+  gymProfileImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: COLORS.background,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  gymProfileInfo: {
+    flex: 1,
+  },
+  gymProfileName: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+    marginBottom: 6,
+  },
+  gymProfileAddress: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  gymProfileMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  ratingText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+  },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  verifiedText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: COLORS.success,
+    fontWeight: "600",
+  },
+  gymProfileDetails: {
+    marginBottom: 20,
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  detailText: {
+    marginLeft: 12,
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    flex: 1,
+    lineHeight: 22,
+  },
+  viewFullProfileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  viewFullProfileButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    marginRight: 8,
   },
 });

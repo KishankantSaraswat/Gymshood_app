@@ -51,8 +51,8 @@ export default function LoginScreen() {
       console.log("📡 Login Hook Result:", success);
 
       if (success) {
-        console.log("✅ Login Successful! Redirecting to tabs...");
-        router.replace("/(tabs)");
+        console.log("✅ Login Successful! Redirecting to gym selection...");
+        router.replace("/selectGym");
       } else {
         console.log("❌ Login Failed (Hook returned false/undefined)");
       }
