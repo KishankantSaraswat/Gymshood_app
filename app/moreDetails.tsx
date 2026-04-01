@@ -2,7 +2,6 @@ import { Picker } from "@react-native-picker/picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +11,7 @@ import {
   ScrollView,
   Platform,
 } from "react-native";
+import CustomAlert from "../components/CustomAlert";
 import { useAuth } from "../hooks/useAuth";
 
 export default function MoreDetailsScreen() {
@@ -27,6 +27,23 @@ export default function MoreDetailsScreen() {
   const [pincode, setPincode] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+
   const name = params.name as string;
   const email = params.email as string;
   const password = params.password as string;
@@ -34,7 +51,7 @@ export default function MoreDetailsScreen() {
 
   const handleSubmit = async () => {
     if (!height || !weight || !address || !pincode) {
-      Alert.alert("Error", "Please fill all details");
+      showAlert("Error", "Please fill all details", "warning");
       return;
     }
 
@@ -59,10 +76,10 @@ export default function MoreDetailsScreen() {
           params: { email },
         });
       } else {
-        Alert.alert("Error", "Registration failed. Try again.");
+        showAlert("Error", "Registration failed. Try again.", "error");
       }
     } catch (err) {
-      Alert.alert("Error", "Something went wrong.");
+      showAlert("Error", "Something went wrong.", "error");
     } finally {
       setLoading(false);
     }
@@ -156,6 +173,15 @@ export default function MoreDetailsScreen() {
           <Text style={styles.linkText}>Back</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 }

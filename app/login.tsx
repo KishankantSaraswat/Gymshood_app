@@ -16,6 +16,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
+import CustomAlert from "../components/CustomAlert";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -24,6 +25,23 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
 
   const openPrivacyPolicy = () => {
     Linking.openURL("https://gymshood.blogspot.com/p/privacy-policy.html");
@@ -40,7 +58,7 @@ export default function LoginScreen() {
 
     if (!email || !password) {
       console.log("⚠️ Login Validation Failed: Missing fields");
-      Alert.alert("Error", "Please fill in all fields");
+      showAlert("Error", "Please fill in all fields", "warning");
       return;
     }
 
@@ -58,7 +76,7 @@ export default function LoginScreen() {
       }
     } catch (error) {
       console.error("❌ Login Error:", error);
-      Alert.alert("Error", "Login failed. Please try again.");
+      showAlert("Error", "Login failed. Please try again.", "error");
     } finally {
       setLoading(false);
       console.log("🏁 Login Attempt Finished");
@@ -92,7 +110,7 @@ export default function LoginScreen() {
             await login(data.email, data.password);
           } catch (error) {
             console.error("❌ Auto-Login Failed:", error);
-            Alert.alert("Error", "Login failed. Please try again.");
+            showAlert("Error", "Login failed. Please try again.", "error");
           } finally {
             setLoading(false);
           }
@@ -179,6 +197,15 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 }

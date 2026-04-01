@@ -5,11 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from "react-native";
+import CustomAlert from "../components/CustomAlert";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
@@ -28,9 +28,26 @@ export default function ForgotPasswordScreen() {
   const [resetSessionId, setResetSessionId] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+
   const handleSendOTP = async () => {
     if (!email) {
-      Alert.alert("Error", "Please enter your email");
+      showAlert("Error", "Please enter your email", "warning");
       return;
     }
 
@@ -48,14 +65,14 @@ export default function ForgotPasswordScreen() {
       console.log("Forgot Password Response:", data);
 
       if (response.ok) {
-        Alert.alert("Success", data.message || "OTP sent to your email");
+        showAlert("Success", data.message || "OTP sent to your email", "success");
         setStep(2); // Move to OTP verification step
       } else {
-        Alert.alert("Error", data.message || "Failed to send OTP");
+        showAlert("Error", data.message || "Failed to send OTP", "error");
       }
     } catch (error) {
       console.error("Send OTP error:", error);
-      Alert.alert("Error", "Failed to send OTP. Please try again.");
+      showAlert("Error", "Failed to send OTP. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -63,7 +80,7 @@ export default function ForgotPasswordScreen() {
 
   const handleVerifyOTP = async () => {
     if (!otp) {
-      Alert.alert("Error", "Please enter the OTP");
+      showAlert("Error", "Please enter the OTP", "warning");
       return;
     }
 
@@ -82,14 +99,14 @@ export default function ForgotPasswordScreen() {
 
       if (response.ok) {
         setResetSessionId(data.resetSessionId);
-        Alert.alert("Success", "OTP verified successfully");
+        showAlert("Success", "OTP verified successfully", "success");
         setStep(3); // Move to password reset step
       } else {
-        Alert.alert("Error", data.message || "Invalid OTP");
+        showAlert("Error", data.message || "Invalid OTP", "error");
       }
     } catch (error) {
       console.error("Verify OTP error:", error);
-      Alert.alert("Error", "Failed to verify OTP. Please try again.");
+      showAlert("Error", "Failed to verify OTP. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -97,17 +114,17 @@ export default function ForgotPasswordScreen() {
 
   const handleResetPassword = async () => {
     if (!password || !confirmPassword) {
-      Alert.alert("Error", "Please enter both password fields");
+      showAlert("Error", "Please enter both password fields", "warning");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords don't match");
+      showAlert("Error", "Passwords don't match", "error");
       return;
     }
 
     if (password.length < 8 || password.length > 16) {
-      Alert.alert("Error", "Password must be between 8 and 16 characters");
+      showAlert("Error", "Password must be between 8 and 16 characters", "warning");
       return;
     }
 
@@ -125,17 +142,18 @@ export default function ForgotPasswordScreen() {
       console.log("Reset Password Response:", data);
 
       if (response.ok) {
-        Alert.alert(
+        showAlert(
           "Success",
           "Password reset successfully. Please login with your new password.",
+          "success",
           [{ text: "OK", onPress: () => router.replace("/login") }]
         );
       } else {
-        Alert.alert("Error", data.message || "Failed to reset password");
+        showAlert("Error", data.message || "Failed to reset password", "error");
       }
     } catch (error) {
       console.error("Reset password error:", error);
-      Alert.alert("Error", "Failed to reset password. Please try again.");
+      showAlert("Error", "Failed to reset password. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -307,6 +325,15 @@ export default function ForgotPasswordScreen() {
           <Text style={styles.linkText}>← Back to Login</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 }

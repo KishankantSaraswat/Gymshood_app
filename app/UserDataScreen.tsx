@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import CustomAlert from "../components/CustomAlert";
 
 import { useAuth } from "../hooks/useAuth";
 
@@ -149,6 +150,23 @@ export default function UserDataScreen() {
   const [pastInjury, setPastInjury] = useState("");
   const [preferredGymTime, setPreferredGymTime] = useState("");
   const [profileCompletion, setProfileCompletion] = useState(0);
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
 
   // Calculate profile completion percentage
   const calculateProfileCompletion = () => {
@@ -300,27 +318,27 @@ export default function UserDataScreen() {
   const handleSave = async () => {
     // Validation
     if (!name.trim()) {
-      Alert.alert("Validation Error", "Please enter your name");
+      showAlert("Validation Error", "Please enter your name", "warning");
       return;
     }
 
     if (sleepHours && (isNaN(Number(sleepHours)) || Number(sleepHours) < 0 || Number(sleepHours) > 24)) {
-      Alert.alert("Validation Error", "Sleep hours must be between 0 and 24");
+      showAlert("Validation Error", "Sleep hours must be between 0 and 24", "warning");
       return;
     }
 
     if (dailyWater && (isNaN(Number(dailyWater)) || Number(dailyWater) < 0)) {
-      Alert.alert("Validation Error", "Daily water intake must be a positive number");
+      showAlert("Validation Error", "Daily water intake must be a positive number", "warning");
       return;
     }
 
     if (weight && (isNaN(Number(weight)) || Number(weight) < 0)) {
-      Alert.alert("Validation Error", "Weight must be a positive number");
+      showAlert("Validation Error", "Weight must be a positive number", "warning");
       return;
     }
 
     if (height && (isNaN(Number(height)) || Number(height) < 0)) {
-      Alert.alert("Validation Error", "Height must be a positive number");
+      showAlert("Validation Error", "Height must be a positive number", "warning");
       return;
     }
 
@@ -328,7 +346,7 @@ export default function UserDataScreen() {
       setSaving(true);
 
       if (!user?._id) {
-        Alert.alert("Error", "User not authenticated");
+        showAlert("Error", "User not authenticated", "error");
         return;
       }
 
@@ -404,17 +422,18 @@ export default function UserDataScreen() {
       console.log("Response data:", data);
 
       if (response.ok) {
-        Alert.alert("Success", "Profile updated successfully", [
+        showAlert("Success", "Profile updated successfully", "success", [
           { text: "OK", onPress: () => router.replace("/(tabs)") },
         ]);
       } else {
-        Alert.alert("Error", data.message || "Failed to update profile");
+        showAlert("Error", data.message || "Failed to update profile", "error");
       }
     } catch (error: any) {
       console.error("Failed to update profile:", error);
-      Alert.alert(
+      showAlert(
         "Error",
-        error.message || "Failed to update profile. Please try again."
+        error.message || "Failed to update profile. Please try again.",
+        "error"
       );
     } finally {
       setSaving(false);

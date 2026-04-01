@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import CustomAlert from "../../components/CustomAlert";
 import {
   Camera,
   useCameraDevice,
@@ -101,7 +102,7 @@ const COLORS = {
 
 export default function PlansScreen() {
   const [plans, setPlans] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("plans");
@@ -110,6 +111,23 @@ export default function PlansScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const isFocused = useIsFocused();
   const [scanning, setScanning] = useState(true); // Add this to your component state
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
 
   const device = useCameraDevice("back");
   const codeScanner = useCodeScanner({
@@ -252,9 +270,10 @@ export default function PlansScreen() {
 
       if (activeCheckInPlan) {
         if (activeCheckInPlan.gymId !== qrData) {
-          Alert.alert(
+          showAlert(
             "Wrong Gym",
             `This QR is for a different gym. Your plan is for ${activeCheckInPlan.gymDetails.name}`,
+            "warning",
             [
               {
                 text: "OK",
@@ -276,11 +295,12 @@ export default function PlansScreen() {
         console.log("Scan Result", result);
 
         if (response.ok) {
-          Alert.alert(
+          showAlert(
             "Check-In Successful",
             `You're checked in until ${new Date(
               result.checkOutTime
             ).toLocaleTimeString()}`,
+            "success",
             [
               {
                 text: "OK",
@@ -295,7 +315,7 @@ export default function PlansScreen() {
         } else {
           if (result.message.includes("already checked in")) {
             // Show custom alert with checkout option
-            Alert.alert("Already Checked In", result.message, [
+            showAlert("Already Checked In", result.message, "warning", [
               {
                 text: "Cancel",
                 style: "cancel",
@@ -307,7 +327,7 @@ export default function PlansScreen() {
               },
             ]);
           } else {
-            Alert.alert("Error", result.message || "Check-in failed", [
+            showAlert("Error", result.message || "Check-in failed", "error", [
               {
                 text: "OK",
                 onPress: () => setScanning(true), // Resume scanning
@@ -317,7 +337,7 @@ export default function PlansScreen() {
         }
       }
     } catch (e) {
-      Alert.alert("Error", "Invalid QR code format", [
+      showAlert("Error", "Invalid QR code format", "error", [
         {
           text: "OK",
           onPress: () => setScanning(true), // Resume scanning
@@ -338,9 +358,10 @@ export default function PlansScreen() {
       const result = await response.json();
 
       if (response.ok) {
-        Alert.alert(
+        showAlert(
           "Check-Out Successful",
           "You have been successfully checked out",
+          "success",
           [
             {
               text: "OK",
@@ -352,11 +373,11 @@ export default function PlansScreen() {
           ]
         );
       } else {
-        Alert.alert("Error", result.message || "Check-out failed");
+        showAlert("Error", result.message || "Check-out failed", "error");
       }
     } catch (error) {
       console.error("Check-out error:", error);
-      Alert.alert("Error", "Failed to check out");
+      showAlert("Error", "Failed to check out", "error");
     } finally {
       setScanning(true); // Resume scanning
     }
@@ -540,9 +561,10 @@ export default function PlansScreen() {
                   setActiveCheckInPlan(item);
                 } else {
                   // Only show explanation if permission was denied
-                  Alert.alert(
+                  showAlert(
                     "Permission Required",
                     "Camera permission is needed to scan QR codes. Please enable it in Settings.",
+                    "info",
                     [
                       {
                         text: "Cancel",
@@ -824,6 +846,15 @@ export default function PlansScreen() {
           </View>
         )}
       </ScrollView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
 
       {activeCheckInPlan && (
         <Modal

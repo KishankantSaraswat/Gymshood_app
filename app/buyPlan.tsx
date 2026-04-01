@@ -22,6 +22,7 @@ import { WebView } from "react-native-webview";
 import { getValidity } from "./gymProfile";
 import { fixUrl } from "../utils/imageHelper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import CustomAlert from "../components/CustomAlert";
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
 
@@ -43,6 +44,23 @@ const PurchasePlanScreen = () => {
   const [phone, setPhone] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [cashRequestData, setCashRequestData] = useState<any>(null);
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
 
   useEffect(() => {
     const getUserDetails = async () => {
@@ -82,18 +100,19 @@ const PurchasePlanScreen = () => {
     });
 
     if (!agreeTerms) {
-      Alert.alert(
+      showAlert(
         "Terms Required",
-        "You must agree to the terms and conditions"
+        "You must agree to the terms and conditions",
+        "warning"
       );
       return;
     }
     if (!name || !email || !phone) {
-      Alert.alert("Missing Info", "Please fill all the required details");
+      showAlert("Missing Info", "Please fill all the required details", "warning");
       return;
     }
     if (!(phone.length >= 10 && phone.length <= 13)) {
-      Alert.alert("Invalid Contact", "Please fill a valid contact.");
+      showAlert("Invalid Contact", "Please fill a valid contact.", "warning");
       return;
     }
     setLoading(true);
@@ -165,7 +184,7 @@ const PurchasePlanScreen = () => {
     } catch (error: any) {
       console.error("[BuyPlan] Payment Error:", error);
       console.log('========== BUY PLAN - FAILED ==========\n');
-      Alert.alert("Payment Error", error.message || "Something went wrong");
+      showAlert("Payment Error", error.message || "Something went wrong", "error");
       setLoading(false);
     }
   };
@@ -178,7 +197,7 @@ const PurchasePlanScreen = () => {
       const orderId = successParams.get("order_id");
       setShowWebView(false);
     } else if (url.includes("razorpay.com/payment/fail")) {
-      Alert.alert("Payment Failed", "The payment was not successful");
+      showAlert("Payment Failed", "The payment was not successful", "error");
       setShowWebView(false);
       setLoading(false);
     }
@@ -226,7 +245,7 @@ const PurchasePlanScreen = () => {
       });
     } catch (error: any) {
       console.error("Verification Error", error);
-      Alert.alert("Error", error.message || "Payment verification failed");
+      showAlert("Error", error.message || "Payment verification failed", "error");
     } finally {
       setLoading(false);
     }
@@ -280,7 +299,7 @@ const PurchasePlanScreen = () => {
     } else if (message.type === "payment-dismissed") {
       setShowWebView(false);
       setLoading(false);
-      Alert.alert("Payment Cancelled", "The payment was cancelled by the user");
+      showAlert("Payment Cancelled", "The payment was cancelled by the user", "info");
     }
   };
 
@@ -413,28 +432,18 @@ const PurchasePlanScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Purchase Buttons */}
+        {/* Purchase Button */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={[styles.purchaseButton, styles.cashButton]}
+            style={[styles.purchaseButton, styles.enrollButton]}
             onPress={() => handlePurchase('cash')}
-            disabled={loading}
-          >
-            <MaterialIcons name="payments" size={20} color="#6C63FF" style={{ marginRight: 6 }} />
-            <Text style={[styles.purchaseButtonText, { color: '#6C63FF' }]}>Pay Cash</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.purchaseButton, styles.onlineButton]}
-            onPress={() => handlePurchase('online')}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <View style={styles.buttonTextContainer}>
-                <Text style={styles.purchaseButtonText}>Buy Now</Text>
-                <Text style={styles.purchaseButtonAmount}>₹{discountedPrice}</Text>
+                <Text style={styles.purchaseButtonText}>Enroll Now</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -452,13 +461,13 @@ const PurchasePlanScreen = () => {
             <View style={styles.modalIconContainer}>
               <FontAwesome5 name="clock" size={40} color="#FFA500" />
             </View>
-            <Text style={styles.modalTitle}>Request Sent!</Text>
+            <Text style={styles.modalTitle}>Enrollment Request Sent!</Text>
             <Text style={styles.modalMessage}>
-              Your request to pay by cash has been sent to the gym partner.
-              Please pay ₹{discountedPrice} at the gym counter to activate your membership.
+              Your enrollment request has been sent to the gym partner.
+              Please visit the gym to confirm and activate your membership at the counter.
             </Text>
             <Text style={styles.modalSubMessage}>
-              Status: Pending Approval
+              Status: Pending Gym Approval
             </Text>
 
             <TouchableOpacity
@@ -501,6 +510,15 @@ const PurchasePlanScreen = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 };
@@ -716,30 +734,18 @@ const styles = StyleSheet.create({
     elevation: 6,
     minHeight: 64,
   },
-  onlineButton: {
+  enrollButton: {
     backgroundColor: "#6C63FF",
-  },
-  cashButton: {
-    backgroundColor: "#fff",
-    borderWidth: 2,
-    borderColor: "#6C63FF",
   },
   purchaseButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     textAlign: 'center',
   },
   buttonTextContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  purchaseButtonAmount: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginTop: 2,
-    opacity: 0.9,
   },
   loadingOverlay: {
     position: "absolute",

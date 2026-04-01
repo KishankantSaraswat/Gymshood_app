@@ -4,7 +4,7 @@ export default ({ config }) => ({
   ...config,
   name: "GymsHood",
   slug: "gymshood",
-  version: "1.0.1",
+  version: "1.0.2",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "gymshood",

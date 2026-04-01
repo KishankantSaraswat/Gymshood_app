@@ -17,6 +17,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { fixUrl } from "../utils/imageHelper";
+import CustomAlert from "../components/CustomAlert";
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
 
@@ -89,6 +90,23 @@ export default function SelectGymScreen() {
     longitude: number;
     latitude: number;
   } | null>(null);
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
 
   const fetchData = async () => {
     try {
@@ -164,14 +182,14 @@ export default function SelectGymScreen() {
         logoUrl: gym.media?.logoUrl || gym.media?.frontPhotoUrl
       }));
 
-      Alert.alert(
+      showAlert(
         "Gym Selected",
         `You have selected ${gym.name}. Redirecting to home...`,
+        'success',
         [
           {
             text: "OK",
             onPress: () => {
-              // Navigate to home screen (tabs)
               router.replace("/(tabs)");
             }
           }
@@ -179,7 +197,7 @@ export default function SelectGymScreen() {
       );
     } catch (error) {
       console.error("Error saving gym selection:", error);
-      Alert.alert("Error", "Failed to save gym selection. Please try again.");
+      showAlert("Error", "Failed to save gym selection. Please try again.", 'error');
     }
   };
 
@@ -290,7 +308,10 @@ export default function SelectGymScreen() {
                         {convertTo12Hour(gym.openTime)} - {convertTo12Hour(gym.closeTime)}
                       </Text>
                     </View>
-                    <TouchableOpacity style={styles.selectButton}>
+                    <TouchableOpacity 
+                      style={styles.selectButton}
+                      onPress={() => handleGymSelection(gym)}
+                    >
                       <Text style={styles.selectButtonText}>Select Gym</Text>
                     </TouchableOpacity>
                   </View>
@@ -300,6 +321,15 @@ export default function SelectGymScreen() {
           )}
         </View>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 }

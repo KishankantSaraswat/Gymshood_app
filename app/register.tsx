@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../hooks/useAuth";
+import CustomAlert from "../components/CustomAlert";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -29,14 +30,31 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+
   const handleNext = () => {
     if (!form.name || !form.email || !form.password || !form.confirmPassword) {
-      Alert.alert("Error", "Please fill in all fields");
+      showAlert("Error", "Please fill in all fields", "warning");
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      Alert.alert("Error", "Passwords don't match");
+      showAlert("Error", "Passwords don't match", "error");
       return;
     }
 
@@ -53,12 +71,12 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!form.name || !form.email || !form.password || !form.confirmPassword) {
-      Alert.alert("Error", "Please fill in all fields");
+      showAlert("Error", "Please fill in all fields", "warning");
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      Alert.alert("Error", "Passwords don't match");
+      showAlert("Error", "Passwords don't match", "error");
       return;
     }
 
@@ -72,10 +90,10 @@ export default function RegisterScreen() {
           params: { email: form.email },
         });
       } else {
-        Alert.alert("Error", "Registration failed. Please try again.");
+        showAlert("Error", "Registration failed. Please try again.", "error");
       }
     } catch (error) {
-      Alert.alert("Error", "Registration failed. Please try again.");
+      showAlert("Error", "Registration failed. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -197,6 +215,15 @@ export default function RegisterScreen() {
           <Text style={styles.linkText}>Already have an account? Login</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 }

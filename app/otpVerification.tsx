@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, TextInput, Button, Alert, StyleSheet, Text } from "react-native";
+import { View, TextInput, Button, StyleSheet, Text } from "react-native";
+import CustomAlert from "../components/CustomAlert";
 import { useRoute } from "@react-navigation/native";
 import { useAuth } from "../hooks/useAuth"; // adjust the path
 import Constants from "expo-constants";
@@ -18,6 +19,23 @@ const OtpVerificationScreen = () => {
   const route = useRoute();
   const { email } = route.params as { email: string };
   const { login } = useAuth();
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
 
   const handleVerify = async () => {
     console.log("🔐 Frontend: Starting OTP Verification");
@@ -51,13 +69,19 @@ const OtpVerificationScreen = () => {
       console.log("✅ Success response:", result);
 
       if (result.success) {
-        Alert.alert("Success", "Registration Successfull");
-        router.push("/selectGym");
+        showAlert("Success", "Registration Successful", "success", [
+          {
+            text: "OK",
+            onPress: () => {
+              router.push("/selectGym");
+            }
+          }
+        ]);
       }
     } catch (err: any) {
       console.error("❌ Verification error:", err);
       console.error("❌ Error message:", err.message);
-      Alert.alert("Error", err.message);
+      showAlert("Error", err.message, "error");
     }
   };
 
@@ -76,8 +100,17 @@ const OtpVerificationScreen = () => {
       />
 
       <View style={styles.buttonContainer}>
-        <Button title="Verify OTP" onPress={handleVerify} color="#007BFF" />
+        <Button title="Verify OTP" onPress={handleVerify} color="#6C63FF" />
       </View>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 };

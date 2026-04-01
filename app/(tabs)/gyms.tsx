@@ -80,7 +80,7 @@ const getDistance = (
 
 export default function GymsScreen() {
   console.log("Rendering Gyms Screen");
-  const { selectedGym, hasSelectedGym } = useGymSelection();
+  const { selectedGym, hasSelectedGym, loading: selectionLoading } = useGymSelection();
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -211,6 +211,15 @@ export default function GymsScreen() {
 
 
 
+
+  if (selectionLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.primary} />
@@ -247,8 +256,16 @@ export default function GymsScreen() {
         </LinearGradient>
 
         {/* Show Selected Gym Profile or All Gyms */}
-        {hasSelectedGym && selectedGymDetails ? (
+        {hasSelectedGym ? (
           <View style={styles.selectedGymContainer}>
+            {!selectedGymDetails ? (
+              <View style={[styles.gymProfileCard, { padding: 40, alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={{ marginTop: 16, color: COLORS.textSecondary }}>
+                  Loading your gym details...
+                </Text>
+              </View>
+            ) : (
             <View style={styles.gymProfileCard}>
               <View style={styles.gymProfileHeader}>
                 {selectedGymDetails.media?.logoUrl || selectedGymDetails.media?.frontPhotoUrl ? (
@@ -268,7 +285,7 @@ export default function GymsScreen() {
                     <View style={styles.ratingContainer}>
                       <Ionicons name="star" size={16} color="#FFD700" />
                       <Text style={styles.ratingText}>
-                        {selectedGymDetails.avgRating?.toFixed(1) || "0.0"}
+                        {selectedGymDetails!.avgRating?.toFixed(1) || "0.0"}
                       </Text>
                     </View>
                     <View style={styles.verifiedBadge}>
@@ -283,16 +300,16 @@ export default function GymsScreen() {
                 <View style={styles.detailItem}>
                   <Ionicons name="time-outline" size={20} color={COLORS.primary} />
                   <Text style={styles.detailText}>
-                    {convertTo12Hour(selectedGymDetails.openTime)} - {convertTo12Hour(selectedGymDetails.closeTime)}
+                    {convertTo12Hour(selectedGymDetails!.openTime)} - {convertTo12Hour(selectedGymDetails!.closeTime)}
                   </Text>
                 </View>
                 <View style={styles.detailItem}>
                   <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-                  <Text style={styles.detailText}>{selectedGymDetails.location.address}</Text>
+                  <Text style={styles.detailText}>{selectedGymDetails!.location.address}</Text>
                 </View>
                 <View style={styles.detailItem}>
                   <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
-                  <Text style={styles.detailText}>{selectedGymDetails.about}</Text>
+                  <Text style={styles.detailText}>{selectedGymDetails!.about}</Text>
                 </View>
               </View>
 
@@ -301,7 +318,7 @@ export default function GymsScreen() {
                 onPress={() => {
                   router.push({
                     pathname: "/gymProfile",
-                    params: { id: selectedGymDetails._id }
+                    params: { id: selectedGymDetails!._id }
                   });
                 }}
               >
@@ -309,6 +326,7 @@ export default function GymsScreen() {
                 <Ionicons name="arrow-forward" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
+            )}
           </View>
         ) : (
           <>

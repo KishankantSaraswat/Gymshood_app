@@ -16,10 +16,11 @@ import {
   TextInput,
   Linking,
   KeyboardAvoidingView,
-  Platform,
   StatusBar,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import CustomAlert from "../components/CustomAlert";
 // Removed TabView import as we're implementing custom tabs
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
@@ -287,6 +288,23 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
   const [submitting, setSubmitting] = useState(false);
   const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
 
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+
   useEffect(() => {
     fetchCurrentUser();
   }, []);
@@ -324,7 +342,7 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
 
       if (!response.ok) {
         console.error("Server error detail:", data);
-        Alert.alert("Error", data.message || "Failed to fetch reviews");
+        showAlert("Error", data.message || "Failed to fetch reviews", "error");
         return;
       }
 
@@ -353,12 +371,12 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
 
   const submitReview = async () => {
     if (!rating) {
-      Alert.alert("Error", "Please select a rating before submitting.");
+      showAlert("Error", "Please select a rating before submitting.", "warning");
       return;
     }
 
     if (!feedback.trim()) {
-      Alert.alert("Error", "Please write your feedback before submitting.");
+      showAlert("Error", "Please write your feedback before submitting.", "warning");
       return;
     }
 
@@ -394,19 +412,20 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
       const result = await response.json();
 
       if (!response.ok) {
-        Alert.alert("Error", result.message || "Submission failed");
+        showAlert("Error", result.message || "Submission failed", "error");
       } else {
-        Alert.alert(
+        showAlert(
           "Success",
           existingReviewId
             ? "Review updated successfully!"
-            : "Thank you for your review!"
+            : "Thank you for your review!",
+          "success"
         );
         fetchReviews();
       }
     } catch (error) {
       console.error("Error submitting review:", error);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      showAlert("Error", "Something went wrong. Please try again.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -551,6 +570,14 @@ const ReviewsTab = ({ gymId }: { gymId: string }) => {
           </View>
         )}
       </View>
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 };
@@ -745,6 +772,23 @@ export default function GymProfileScreen() {
   const [index, setIndex] = useState(0);
   const [plans, setPlans] = useState<any[]>([]);
 
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
+
   const [routes] = React.useState([
     { key: "plans", title: "PLANS" },
     { key: "photos", title: "PHOTOS" },
@@ -770,7 +814,7 @@ export default function GymProfileScreen() {
           if (matchedGym) {
             setGym(matchedGym);
           } else {
-            Alert.alert("Error", "Gym not found");
+            showAlert("Error", "Gym not found", "error");
           }
         }
 
@@ -779,7 +823,7 @@ export default function GymProfileScreen() {
         }
       } catch (error) {
         console.error(error);
-        Alert.alert("Error", "Failed to load data");
+        showAlert("Error", "Failed to load data", "error");
       } finally {
         setLoading(false);
       }
@@ -880,7 +924,7 @@ export default function GymProfileScreen() {
                     const [longitude, latitude] = gym.location.coordinates;
                     const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
                     Linking.openURL(url).catch((err) => {
-                      Alert.alert("Error", "Could not open Google Maps");
+                      showAlert("Error", "Could not open Google Maps", "error");
                       console.error("Failed to open maps:", err);
                     });
                   }}

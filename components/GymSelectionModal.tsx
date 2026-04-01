@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { fixUrl } from "../utils/imageHelper";
+import CustomAlert from "./CustomAlert";
 
 const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || "";
 
@@ -92,6 +93,23 @@ export default function GymSelectionModal({ visible, onClose, onGymSelected }: G
     longitude: number;
     latitude: number;
   } | null>(null);
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', buttons?: any[]) => {
+    setAlertConfig({ visible: true, title, message, type, buttons });
+  };
 
   const fetchData = async () => {
     try {
@@ -174,7 +192,7 @@ export default function GymSelectionModal({ visible, onClose, onGymSelected }: G
       onClose();
     } catch (error) {
       console.error("Error saving gym selection:", error);
-      Alert.alert("Error", "Failed to save gym selection. Please try again.");
+      showAlert("Error", "Failed to save gym selection. Please try again.", "error");
     }
   };
 
@@ -288,6 +306,14 @@ export default function GymSelectionModal({ visible, onClose, onGymSelected }: G
           )}
         </ScrollView>
       </View>
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </Modal>
   );
 }
